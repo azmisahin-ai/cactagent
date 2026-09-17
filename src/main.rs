@@ -2,15 +2,61 @@ use cactagent::engine::needle;
 use cactagent::tools::sandbox;
 use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
 
+fn print_help() {
+    println!("CactAgent v0.7.0 - Tamamen yerel AI ajani");
+    println!();
+    println!("KULLANIM:");
+    println!("    cactagent [OPTIONS] \"<gorev>\"");
+    println!();
+    println!("OPSIYONLAR:");
+    println!("    --help              Bu yardim mesajini goster");
+    println!("    --version           Surum bilgisini goster");
+    println!("    --auto-approve      Dosya yazma onayini atla (script/CI icin)");
+    println!();
+    println!("ORNEKLER:");
+    println!("    cactagent \"Rust haberlerini arastir\"");
+    println!("    cactagent \"Write 'Merhaba' to notes.txt\"");
+    println!("    cactagent --auto-approve \"Write 'test' to test.txt\"");
+    println!();
+    println!("ARACLAR:");
+    println!("    web_search   - DuckDuckGo uzerinden arama");
+    println!("    read_url     - Sayfa icerigini oku ve temizle");
+    println!("    read_file    - Sandbox icindeki dosyayi oku");
+    println!("    write_file   - Sandbox icindeki dosyaya yaz");
+    println!("    list_dir     - Sandbox icindeki dizini listele");
+    println!();
+    println!("GUVENLIK:");
+    println!("    - Tum dosya islemleri ./workspace/ icinde sinirli");
+    println!("    - Path traversal ve absolute path reddedilir");
+    println!("    - write_file varsayilan olarak onay ister");
+    println!("    - Maksimum dosya boyutu: 1 MB");
+}
+
+fn print_version() {
+    println!("CactAgent v{}", env!("CARGO_PKG_VERSION"));
+    println!("Lisans: {}", env!("CARGO_PKG_LICENSE"));
+    println!("Repo: {}", env!("CARGO_PKG_REPOSITORY"));
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // CLI argümanlarını al
     let args: Vec<String> = std::env::args().collect();
 
-    // --auto-approve flag'ini kontrol et
+    // --help ve --version
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print_help();
+        return Ok(());
+    }
+
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        print_version();
+        return Ok(());
+    }
+
+    // --auto-approve
     let auto_approve = args.iter().any(|a| a == "--auto-approve");
     if auto_approve {
         sandbox::set_auto_approve(true);
-        println!("[!] Otomatik onay modu aktif. Dosya yazma onayi sorulmayacak.\n");
+        println!("[!] Otomatik onay modu aktif.\n");
     }
 
     // Flag'leri temizle
@@ -67,7 +113,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 println!("=== ARAMA SONUCLARI ===");
                                 println!("{}", r);
                             }
-                            Err(e) => eprintln!("Arama hatasi: {}", e),
+                            Err(e) => {
+                                eprintln!("Hata: Arama yapilamadi.");
+                                eprintln!("Sebep: {}", e);
+                                eprintln!();
+                                eprintln!("Olasi cozumler:");
+                                eprintln!("  - Internet baglantinizi kontrol edin");
+                                eprintln!("  - DuckDuckGo rate limit uyguluyor olabilir, birkac dakika bekleyin");
+                                eprintln!("  - Farkli bir sorgu deneyin");
+                            }
                         }
                     }
                 }
