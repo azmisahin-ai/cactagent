@@ -23,7 +23,10 @@ pub fn read_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
             extract_with_density(&body)?
         }
         Err(e) => {
-            println!("[DEBUG] Readability basarisiz: {}, fallback kullaniliyor", e);
+            println!(
+                "[DEBUG] Readability basarisiz: {}, fallback kullaniliyor",
+                e
+            );
             extract_with_density(&body)?
         }
     };
@@ -53,9 +56,9 @@ fn readability_extract(html: &str, url: &str) -> Result<String, Box<dyn std::err
 // Fallback: yogunluk bazli cikarim
 fn extract_with_density(body: &str) -> Result<String, Box<dyn std::error::Error>> {
     let document = Html::parse_document(body);
-    let remove_selector = Selector::parse(
-        "script, style, nav, header, footer, aside, form, iframe, svg, noscript",
-    ).unwrap();
+    let remove_selector =
+        Selector::parse("script, style, nav, header, footer, aside, form, iframe, svg, noscript")
+            .unwrap();
 
     let mut clean_html = body.to_string();
     for element in document.select(&remove_selector) {
@@ -127,8 +130,12 @@ fn clean_text(text: &str) -> String {
 
     // "Ana Sayfa", "Home", "Menu" gibi kalıpları baştan temizle
     let noise_prefixes = [
-        "Ana Sayfa ", "Home ", "Menu ", "Skip to content ",
-        "Anasayfa ", "İçeriğe geç ",
+        "Ana Sayfa ",
+        "Home ",
+        "Menu ",
+        "Skip to content ",
+        "Anasayfa ",
+        "İçeriğe geç ",
     ];
     for prefix in &noise_prefixes {
         if cleaned.starts_with(prefix) {
@@ -140,10 +147,7 @@ fn clean_text(text: &str) -> String {
     let filtered: Vec<&str> = lines
         .iter()
         .filter(|line| {
-            line.len() > 20
-                || line.ends_with('.')
-                || line.ends_with('!')
-                || line.ends_with('?')
+            line.len() > 20 || line.ends_with('.') || line.ends_with('!') || line.ends_with('?')
         })
         .copied()
         .collect();

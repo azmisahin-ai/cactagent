@@ -40,11 +40,12 @@ pub fn ensure_model() -> String {
     let api = hf_hub::api::sync::Api::new().expect("HF API baslatilamadi");
     let repo = api.model("Cactus-Compute/needle2".to_string());
 
-    let downloaded_path = repo
-        .get("needle2.cact")
-        .expect("needle2.cact indirilemedi");
+    let downloaded_path = repo.get("needle2.cact").expect("needle2.cact indirilemedi");
 
-    println!("[DEBUG] Model HF cache'ine indirildi: {:?}", downloaded_path);
+    println!(
+        "[DEBUG] Model HF cache'ine indirildi: {:?}",
+        downloaded_path
+    );
 
     std::fs::create_dir_all("weights").expect("weights klasoru olusturulamadi");
     std::fs::copy(&downloaded_path, path).expect("Model kopyalanamadi");
@@ -59,7 +60,8 @@ mod tests {
 
     #[test]
     fn test_parse_tool_call() {
-        let input = "<tool_call>[{\"name\":\"web_search\",\"arguments\":{\"query\":\"test\"}}]</tool_call>";
+        let input =
+            "<tool_call>[{\"name\":\"web_search\",\"arguments\":{\"query\":\"test\"}}]</tool_call>";
         let calls = parse_tool_call(input).unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0]["name"], "web_search");

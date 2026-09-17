@@ -1,4 +1,4 @@
-use cactagent::engine::{needle};
+use cactagent::engine::needle;
 use cactagent::tools::{reader, search, TOOLS_JSON};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +34,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(call) = tool_calls.first() {
             let name = call["name"].as_str().unwrap_or("");
             if name == "web_search" {
-                call["arguments"]["query"].as_str().unwrap_or("").to_string()
+                call["arguments"]["query"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string()
             } else {
                 user_task.clone()
             }
