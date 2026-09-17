@@ -8,17 +8,21 @@ Sürümleme: [Semantic Versioning](https://semver.org/)
 ## [0.5.0] — 2026-09-17
 
 ### Eklendi
-- `src/agent.rs` — Deneysel ReAct döngüsü
-- Çok adımlı görev desteği (5 iterasyona kadar)
-- Bağlam yönetimi (son 3 sonuç)
+- `src/agent.rs` — Deneysel ReAct döngüsü (çok adımlı görevler)
 - 5 yeni test (toplam 36 test)
+- Rate limit (HTTP 202) algılama ve uzun bekleme
+
+### Değişti
+- `main.rs` tek adımlı akışa döndü (stabilite için)
+- README'de ReAct "deneysel" olarak işaretlendi
 
 ### Bilinen Sorunlar
 - **ReAct döngüsü kararsız:** Needle v2 (26M), çok adımlı bağlamda
-  olmayan araçları uyduruyor ve saçmalıyor. Bu, modelin parametre
-  sınırından kaynaklanıyor. Daha büyük bir model gerekli.
-- Ana akış (`main.rs`) tek adımlı olarak kalmaya devam ediyor.
-  `agent.rs` deneysel olarak kütüphanede duruyor.
+  olmayan araçları uyduruyor. Bu, modelin parametre sınırından
+  kaynaklanıyor, yazılım hatası değil. Daha büyük model gerekli.
+- **DuckDuckGo rate limit:** Yoğun kullanımda 202 döndürüyor.
+  Retry mekanizması ile kısmen çözüldü, tam çözüm için alternatif
+  arama sağlayıcısı gerekli.
   
 ## [0.4.0] — 2026-09-17
 

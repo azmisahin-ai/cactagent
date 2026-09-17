@@ -21,11 +21,24 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
 
         match client.get(&url).send() {
             Ok(response) => {
-                println!("[DEBUG] Yanit status: {}", response.status());
+                let status = response.status();
+                println!("[DEBUG] Yanit status: {}", status);
                 body = response.text()?;
                 println!("[DEBUG] Body uzunlugu: {} karakter", body.len());
-                last_error = None;
-                break;
+
+                // 202 Accepted = DuckDuckGo rate limit / bot koruması
+                if status.as_u16() == 202 {
+                    println!("[DEBUG] Rate limit algilandi (202). 5 saniye bekleniyor...");
+                    last_error =
+                        Some("Rate limit (HTTP 202). Lutfen birkac dakika bekleyin.".into());
+                    if attempt < 3 {
+                        std::thread::sleep(std::time::Duration::from_secs(5));
+                        continue;
+                    }
+                } else {
+                    last_error = None;
+                    break;
+                }
             }
             Err(e) => {
                 println!("[DEBUG] Deneme {} basarisiz: {}", attempt, e);
