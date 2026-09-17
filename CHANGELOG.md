@@ -5,6 +5,21 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [0.5.0] — 2026-09-17
+
+### Eklendi
+- `src/agent.rs` — Deneysel ReAct döngüsü
+- Çok adımlı görev desteği (5 iterasyona kadar)
+- Bağlam yönetimi (son 3 sonuç)
+- 5 yeni test (toplam 36 test)
+
+### Bilinen Sorunlar
+- **ReAct döngüsü kararsız:** Needle v2 (26M), çok adımlı bağlamda
+  olmayan araçları uyduruyor ve saçmalıyor. Bu, modelin parametre
+  sınırından kaynaklanıyor. Daha büyük bir model gerekli.
+- Ana akış (`main.rs`) tek adımlı olarak kalmaya devam ediyor.
+  `agent.rs` deneysel olarak kütüphanede duruyor.
+  
 ## [0.4.0] — 2026-09-17
 
 ### Eklendi

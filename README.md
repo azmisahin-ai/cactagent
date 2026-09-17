@@ -87,11 +87,13 @@ Detaylı mimari için: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [x] URL okuma ve readability ile temizleme
 - [x] Otomatik model indirme
 - [x] Retry mekanizması (bağlantı hatalarına karşı)
-- [ ] CI + test altyapısı
-- [ ] Dosya sistemi araçları (sandbox'lı)
-- [ ] Çok adımlı görev döngüsü
-- [ ] E2 Micro / mobil optimizasyonu
+- [x] CI + test altyapısı
+- [x] Sandbox'lı dosya araçları
+- [x] **Deneysel:** ReAct çok adımlı döngü (`src/agent.rs`)
+  - ⚠️ Needle v2'nin 26M parametre sınırı nedeniyle kararsız
+  - Gelecekte daha büyük model ile aktif edilebilir
 - [ ] Opsiyonel: özet modeli (feature flag arkasında)
+- [ ] E2 Micro / mobil optimizasyonu
 - [ ] Kendi kendine geliştirme modu
 
 Detaylı yol haritası için: [docs/ROADMAP.md](docs/ROADMAP.md)

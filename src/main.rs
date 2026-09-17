@@ -1,5 +1,5 @@
-use cactagent::agent::Agent;
 use cactagent::engine::needle;
+use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CLI argümanlarını al
@@ -17,12 +17,96 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let needle_path = needle::ensure_model();
     let needle_engine = needle::load(&needle_path);
 
-    // Ajanı oluştur ve çalıştır
-    let agent = Agent::new(needle_engine);
-    let result = agent.run(&user_task)?;
+    // ADIM 1: Araç seçimi
+    println!("=== ADIM 1: ARAC SECIMI ===");
+    let result = needle_engine.run(&user_task, TOOLS_JSON);
 
-    println!("=== NIHAI CIKTI ===");
-    println!("{}", result);
+    println!("Ham cikti:");
+    println!("{}", result.text);
+    println!("---");
+
+    if let Some(think) = needle::extract_think(&result.text) {
+        println!("[Dusunce] {}", think);
+    }
+
+    // Tool call'ları ayrıştır ve çalıştır
+    if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
+        if tool_calls.is_empty() {
+            println!("Model bos tool call dondurdu.");
+            return Ok(());
+        }
+
+        for call in tool_calls {
+            let name = call["name"].as_str().unwrap_or("bilinmeyen");
+            let args = &call["arguments"];
+
+            println!("\n=== ARAC: {} ===", name);
+            println!("Argumanlar: {}\n", args);
+
+            match name {
+                "web_search" => {
+                    if let Some(query) = args["query"].as_str() {
+                        match search::web_search(query) {
+                            Ok(r) => {
+                                println!("=== ARAMA SONUCLARI ===");
+                                println!("{}", r);
+                            }
+                            Err(e) => eprintln!("Arama hatasi: {}", e),
+                        }
+                    }
+                }
+                "read_url" => {
+                    if let Some(url) = args["url"].as_str() {
+                        match reader::read_url(url) {
+                            Ok(content) => {
+                                println!("=== SAYFA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Okuma hatasi: {}", e),
+                        }
+                    }
+                }
+                "read_file" => {
+                    if let Some(path) = args["path"].as_str() {
+                        match file_ops::read_file(path) {
+                            Ok(content) => {
+                                println!("=== DOSYA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Dosya okuma hatasi: {}", e),
+                        }
+                    }
+                }
+                "write_file" => {
+                    if let (Some(path), Some(content)) =
+                        (args["path"].as_str(), args["content"].as_str())
+                    {
+                        match file_ops::write_file(path, content) {
+                            Ok(msg) => println!("{}", msg),
+                            Err(e) => eprintln!("Dosya yazma hatasi: {}", e),
+                        }
+                    }
+                }
+                "list_dir" => {
+                    let path = args["path"].as_str().unwrap_or(".");
+                    match file_ops::list_dir(path) {
+                        Ok(listing) => {
+                            println!("=== DIZIN ICERIGI ===");
+                            println!("{}", listing);
+                        }
+                        Err(e) => eprintln!("Dizin listeleme hatasi: {}", e),
+                    }
+                }
+                _ => {
+                    eprintln!("Bilinmeyen arac: {}", name);
+                }
+            }
+        }
+    } else {
+        println!("Model bir tool call uretmedi.");
+    }
+
+    println!("\n=== ISLEM TAMAMLANDI ===");
 
     Ok(())
 }
