@@ -75,9 +75,10 @@ Detaylı mimari için: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 |------|----------|-------|
 | `web_search` | DuckDuckGo üzerinden gerçek arama | ✅ |
 | `read_url` | Sayfa içeriğini oku ve readability ile temizle | ✅ |
-| `read_file` | Dosyadan oku (sandbox'lı) | 🚧 Planlı |
-| `write_file` | Dosyaya yaz (sandbox'lı) | 🚧 Planlı |
-| `run_command` | Terminal komutu (whitelist ile) | 🚧 Planlı |
+| `read_file` | Sandbox içindeki dosyayı oku (max 1 MB) | ✅ |
+| `write_file` | Sandbox içindeki dosyaya yaz (max 1 MB) | ✅ |
+| `list_dir` | Sandbox içindeki dizini listele | ✅ |
+| `run_command` | Terminal komutu (whitelist ile, planlı) | 🚧 |
 
 ## 🗺️ Yol Haritası
 

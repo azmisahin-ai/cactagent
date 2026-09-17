@@ -5,6 +5,24 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [0.4.0] — 2026-09-17
+
+### Eklendi
+- `read_file` aracı (sandbox'lı, max 1 MB)
+- `write_file` aracı (sandbox'lı, max 1 MB)
+- `list_dir` aracı (sandbox'lı)
+- `sandbox.rs` güvenlik modülü:
+  - Path traversal (`..`) koruması
+  - Absolute path koruması
+  - Windows drive letter koruması
+  - Workspace otomatik oluşturma
+- 13 yeni test (toplam 35 test)
+- CI/CD pipeline (GitHub Actions)
+
+### Değişti
+- README'ye CI, lisans, sürüm rozetleri eklendi
+- `docs/TOOLS.md` genişletildi
+
 ## [0.2.0] — 2026-09-17
 
 ### Değişti

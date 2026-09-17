@@ -98,31 +98,70 @@ pub mod my_tool;
 - Breadcrumb, menü, reklam temizlenir
 - Cümle sonunda akıllıca kesilir
 
-## Gelecek Araçlar
-
 ### read_file
 
-**Amaç:** Sandbox'lı dizinden dosya okumak
+**Amaç:** Sandbox içindeki bir dosyayı okumak
 
 **Parametreler:**
-- `path` (string): `./workspace/` içindeki dosya yolu
+- `path` (string): `./workspace/` içindeki göreli dosya yolu
+
+**Çıktı:** Dosya içeriği (max 1 MB)
+
+**Örnek:**
+```json
+{"name":"read_file","arguments":{"path":"notes.txt"}}
+```
 
 **Güvenlik:**
-- Path traversal koruması (`..` yasak)
 - Sadece `./workspace/` dizini
+- Path traversal (`..`) reddedilir
+- Absolute path reddedilir
+- Maksimum 1 MB
 
 ### write_file
 
-**Amaç:** Sandbox'lı dizine dosya yazmak
+**Amaç:** Sandbox içindeki bir dosyaya yazmak
 
 **Parametreler:**
-- `path` (string): `./workspace/` içindeki dosya yolu
+- `path` (string): `./workspace/` içindeki göreli dosya yolu
 - `content` (string): Yazılacak içerik
 
+**Çıktı:** Başarı mesajı
+
+**Örnek:**
+```json
+{"name":"write_file","arguments":{"path":"notes.txt","content":"Merhaba"}}
+```
+
 **Güvenlik:**
-- Path traversal koruması
 - Sadece `./workspace/` dizini
-- Kullanıcı onayı (opsiyonel)
+- Path traversal (`..`) reddedilir
+- Absolute path reddedilir
+- Maksimum 1 MB
+- Parent dizinler otomatik oluşturulur
+
+### list_dir
+
+**Amaç:** Sandbox içindeki bir dizini listelemek
+
+**Parametreler:**
+- `path` (string, opsiyonel): Dizin yolu. Boş veya `.` ise workspace kökü
+
+**Çıktı:** Dosya ve dizin listesi
+
+**Örnek:**
+```json
+{"name":"list_dir","arguments":{"path":"."}}
+```
+
+**Çıktı örneği:**
+```
+[DIR]  subdir/
+[FILE] notes.txt (12 byte)
+[FILE] data.json (256 byte)
+```
+
+## Gelecek Araçlar
 
 ### run_command
 
