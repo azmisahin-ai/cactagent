@@ -168,3 +168,52 @@ fn smart_truncate(text: &str, max_chars: usize) -> String {
         truncated[..last_sentence_end].to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_smart_truncate_short_text() {
+        let text = "Short text.";
+        let result = smart_truncate(text, 100);
+        assert_eq!(result, "Short text.");
+    }
+
+    #[test]
+    fn test_smart_truncate_long_text() {
+        let text = "First sentence. Second sentence. Third sentence. Fourth sentence.";
+        let result = smart_truncate(text, 30);
+        // 30 karakterden kısa olmalı ve cümle sonunda bitmeli
+        assert!(result.len() <= 30);
+        assert!(result.ends_with('.'));
+    }
+
+    #[test]
+    fn test_smart_truncate_no_sentence_end() {
+        let text = "abcdefghijklmnopqrstuvwxyz";
+        let result = smart_truncate(text, 10);
+        assert_eq!(result, "abcdefghij");
+    }
+
+    #[test]
+    fn test_clean_text_removes_breadcrumb() {
+        let text = "Ana Sayfa » Kategori » Alt Kategori Bu makalenin gerçek içeriği burada başlar.";
+        let result = clean_text(text);
+        // Breadcrumb temizlenmeli
+        assert!(!result.contains("»"));
+    }
+
+    #[test]
+    fn test_clean_text_multiple_spaces() {
+        let text = "Bu    bir    test    metnidir.";
+        let result = clean_text(text);
+        assert_eq!(result, "Bu bir test metnidir.");
+    }
+
+    #[test]
+    fn test_clean_text_empty() {
+        let result = clean_text("");
+        assert_eq!(result, "");
+    }
+}

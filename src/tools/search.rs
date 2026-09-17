@@ -121,4 +121,18 @@ mod tests {
         let cleaned = clean_ddg_url(raw);
         assert_eq!(cleaned, "https://example.com/");
     }
+
+    #[test]
+    fn test_clean_ddg_url_with_special_chars() {
+        let raw =
+            "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fpath%3Fquery%3Dtest&rut=abc";
+        let cleaned = clean_ddg_url(raw);
+        assert_eq!(cleaned, "https://example.com/path?query=test");
+    }
+
+    #[test]
+    fn test_clean_ddg_url_empty() {
+        let cleaned = clean_ddg_url("");
+        assert_eq!(cleaned, "");
+    }
 }

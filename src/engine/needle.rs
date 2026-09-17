@@ -59,12 +59,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_tool_call() {
+    fn test_parse_tool_call_single() {
         let input =
-            "<tool_call>[{\"name\":\"web_search\",\"arguments\":{\"query\":\"test\"}}]</tool_call>";
+            r#"<tool_call>[{"name":"web_search","arguments":{"query":"test"}}]</tool_call>"#;
         let calls = parse_tool_call(input).unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0]["name"], "web_search");
+        assert_eq!(calls[0]["arguments"]["query"], "test");
+    }
+
+    #[test]
+    fn test_parse_tool_call_empty() {
+        let input = "<tool_call>[]</tool_call>";
+        let calls = parse_tool_call(input).unwrap();
+        assert_eq!(calls.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_tool_call_no_tags() {
+        let input = "just some text without tool calls";
+        assert!(parse_tool_call(input).is_none());
+    }
+
+    #[test]
+    fn test_parse_tool_call_multiple() {
+        let input = r#"<tool_call>[{"name":"web_search","arguments":{"query":"a"}},{"name":"read_url","arguments":{"url":"https://example.com"}}]</tool_call>"#;
+        let calls = parse_tool_call(input).unwrap();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0]["name"], "web_search");
+        assert_eq!(calls[1]["name"], "read_url");
     }
 
     #[test]
@@ -72,5 +95,18 @@ mod tests {
         let input = "<think>test thinking</think><tool_call>[]</tool_call>";
         let think = extract_think(input).unwrap();
         assert_eq!(think, "test thinking");
+    }
+
+    #[test]
+    fn test_extract_think_none() {
+        let input = "<tool_call>[]</tool_call>";
+        assert!(extract_think(input).is_none());
+    }
+
+    #[test]
+    fn test_extract_think_multiline() {
+        let input = "<think>\nline 1\nline 2\n</think>";
+        let think = extract_think(input).unwrap();
+        assert_eq!(think, "line 1\nline 2");
     }
 }

@@ -98,3 +98,38 @@ fn extract_first_url(search_results: &str) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_first_url_finds_url() {
+        let search_results = "1. Some Title\n   URL: https://example.com\n   Snippet\n\n";
+        let url = extract_first_url(search_results);
+        assert_eq!(url, Some("https://example.com".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_url_multiple() {
+        let search_results =
+            "1. First\n   URL: https://first.com\n\n2. Second\n   URL: https://second.com\n";
+        let url = extract_first_url(search_results);
+        assert_eq!(url, Some("https://first.com".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_url_none() {
+        let search_results = "No URLs here.";
+        let url = extract_first_url(search_results);
+        assert!(url.is_none());
+    }
+
+    #[test]
+    fn test_extract_first_url_skips_non_http() {
+        let search_results =
+            "1. Title\n   URL: ftp://example.com\n\n2. Title 2\n   URL: https://example.com\n";
+        let url = extract_first_url(search_results);
+        assert_eq!(url, Some("https://example.com".to_string()));
+    }
+}
