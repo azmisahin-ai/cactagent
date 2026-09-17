@@ -1,5 +1,12 @@
 use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Sandbox dizini: tüm dosya işlemleri burada sınırlı
+pub const WORKSPACE_DIR: &str = "workspace";
+
+/// Maksimum dosya boyutu (1 MB)
+pub const MAX_FILE_SIZE: u64 = 1_048_576;
 
 /// Global onay modu (varsayılan: kapalı)
 static AUTO_APPROVE: AtomicBool = AtomicBool::new(false);
@@ -36,12 +43,6 @@ pub fn ask_approval(action: &str, details: &str) -> bool {
     let trimmed = input.trim().to_lowercase();
     trimmed == "e" || trimmed == "evet" || trimmed == "y" || trimmed == "yes"
 }
-
-/// Sandbox dizini: tüm dosya işlemleri burada sınırlı
-pub const WORKSPACE_DIR: &str = "workspace";
-
-/// Maksimum dosya boyutu (1 MB)
-pub const MAX_FILE_SIZE: u64 = 1_048_576;
 
 /// Sandbox dizinini oluşturur (yoksa)
 pub fn ensure_workspace() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -108,18 +109,27 @@ mod tests {
     fn test_safe_path_simple() {
         let result = safe_path("test.txt");
         assert!(result.is_ok());
+        assert!(result.unwrap().to_string_lossy().contains("workspace"));
+    }
+
+    #[test]
+    fn test_safe_path_with_subdir() {
+        let result = safe_path("subdir/test.txt");
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_safe_path_rejects_parent_dir() {
         let result = safe_path("../etc/passwd");
         assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Path traversal"));
     }
 
     #[test]
     fn test_safe_path_rejects_absolute() {
         let result = safe_path("/etc/passwd");
         assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Absolute"));
     }
 
     #[test]
@@ -135,14 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn test_safe_path_with_subdir() {
-        let result = safe_path("subdir/test.txt");
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn test_auto_approve_default() {
-        // Varsayılan olarak kapalı
         set_auto_approve(false);
         assert!(!is_auto_approve());
     }
@@ -151,7 +154,6 @@ mod tests {
     fn test_auto_approve_enable() {
         set_auto_approve(true);
         assert!(is_auto_approve());
-        // Test sonrası sıfırla
         set_auto_approve(false);
     }
 

@@ -136,6 +136,466 @@ Kendi sisteminizde ölçüm yapmak için:
 powershell -ExecutionPolicy Bypass -File scripts\measure.ps1
 ```
 
+Anladım, çok net. **Hiçbir dış bağımlılık (API key, üçüncü parti servis) eklemiyoruz.** Sistem tamamen kendi kendine yeten, bağımsız bir yapı olarak kalacak. Arama motoru konusunu **sonraya** bırakıyoruz; gerekirse kendi arama çözümümüzü değerlendiririz.
+
+Bu durumda **A (Güvenlik)** ile devam ediyoruz — çünkü bu **tamamen içsel**, hiçbir dış bağımlılık gerektirmiyor.
+
+### 🎯 v0.7.0 — Güvenlik İyileştirmeleri
+
+**Hedef:** Kendi kendine çalışan ajanın **kontrolsüz** işlem yapmasını engellemek.
+
+### 📋 Plan
+
+| İyileştirme | Açıklama | Öncelik |
+|-------------|----------|---------|
+| **1. `write_file` onay mekanizması** | Yazmadan önce kullanıcıya sor | 🔴 Yüksek |
+| **2. Audit log** | Hangi araç ne zaman çağrıldı, logla | 🟡 Orta |
+| **3. Rate limiting** | Aynı aracın saniyede N kez çağrılmasını engelle | 🟢 Düşük |
+
+### 📝 1. Adım: `write_file` Onay Mekanizması
+
+İki mod olacak:
+- **`--auto-approve`** flag'i varsa: onay sormadan yaz (CI/script kullanımı için)
+- **Varsayılan:** Yazmadan önce kullanıcıya sor
+
+### 📝 `src/tools/sandbox.rs` — Onay Modülü Ekle
+
+Dosyanın en üstüne ekle:
+
+```rust
+use std::io::{self, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Global onay modu (varsayılan: kapalı)
+static AUTO_APPROVE: AtomicBool = AtomicBool::new(false);
+
+/// Otomatik onay modunu ayarlar
+pub fn set_auto_approve(enabled: bool) {
+    AUTO_APPROVE.store(enabled, Ordering::SeqCst);
+}
+
+/// Otomatik onay modunda mı?
+pub fn is_auto_approve() -> bool {
+    AUTO_APPROVE.load(Ordering::SeqCst)
+}
+
+/// Kullanıcıdan onay ister.
+/// Otomatik onay modundaysa sormaz, doğrudan true döner.
+pub fn ask_approval(action: &str, details: &str) -> bool {
+    if is_auto_approve() {
+        println!("[AUTO-APPROVE] {}: {}", action, details);
+        return true;
+    }
+
+    println!("\n=== ONAY GEREKLI ===");
+    println!("Islem: {}", action);
+    println!("Detay: {}", details);
+    print!("\nOnayliyor musunuz? (e/h): ");
+    io::stdout().flush().ok();
+
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_err() {
+        return false;
+    }
+
+    let trimmed = input.trim().to_lowercase();
+    trimmed == "e" || trimmed == "evet" || trimmed == "y" || trimmed == "yes"
+}
+```
+
+### 📝 `src/tools/file_ops.rs` — `write_file`'a Onay Ekle
+
+`write_file` fonksiyonunu güncelle:
+
+```rust
+use super::sandbox::{ask_approval, safe_path, MAX_FILE_SIZE};
+
+pub fn write_file(path: &str, content: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let full_path = safe_path(path)?;
+
+    // Boyut kontrolü
+    if content.len() as u64 > MAX_FILE_SIZE {
+        return Err(format!(
+            "Icerik cok buyuk: {} byte (max {} byte)",
+            content.len(),
+            MAX_FILE_SIZE
+        )
+        .into());
+    }
+
+    // Onay iste
+    let preview: String = content.chars().take(200).collect();
+    let preview_display = if content.len() > 200 {
+        format!("{}... (toplam {} byte)", preview, content.len())
+    } else {
+        preview
+    };
+
+    let details = format!("Dosya: {}\nIcerik: {}", path, preview_display);
+
+    if !ask_approval("Dosya Yazma", &details) {
+        return Err("Kullanici yazma islemini reddetti.".into());
+    }
+
+    println!("[DEBUG] Dosya yaziliyor: {:?}", full_path);
+
+    // Parent dizinleri oluştur
+    if let Some(parent) = full_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Yaz
+    std::fs::write(&full_path, content)?;
+    println!("[DEBUG] Yazilan boyut: {} byte", content.len());
+
+    Ok(format!(
+        "Dosya basariyla yazildi: {} ({} byte)",
+        path,
+        content.len()
+    ))
+}
+```
+
+### 📝 `src/main.rs` — `--auto-approve` Flag'i Ekle
+
+```rust
+use cactagent::engine::needle;
+use cactagent::tools::sandbox;
+use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // CLI argümanlarını al
+    let args: Vec<String> = std::env::args().collect();
+
+    // --auto-approve flag'ini kontrol et
+    let auto_approve = args.iter().any(|a| a == "--auto-approve");
+    if auto_approve {
+        sandbox::set_auto_approve(true);
+        println!("[!] Otomatik onay modu aktif. Dosya yazma onayi sorulmayacak.\n");
+    }
+
+    // Flag'leri temizle
+    let filtered_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with("--"))
+        .cloned()
+        .collect();
+
+    let user_task = if filtered_args.len() > 1 {
+        filtered_args[1..].join(" ")
+    } else {
+        "Search the web for the latest news about Rust programming language".to_string()
+    };
+
+    println!("=== CactAgent v0.7.0 ===");
+    println!("Gorev: {}\n", user_task);
+
+    // Needle modelini yükle
+    let needle_path = needle::ensure_model();
+    let needle_engine = needle::load(&needle_path);
+
+    // ADIM 1: Araç seçimi
+    println!("=== ADIM 1: ARAC SECIMI ===");
+    let result = needle_engine.run(&user_task, TOOLS_JSON);
+
+    println!("Ham cikti:");
+    println!("{}", result.text);
+    println!("---");
+
+    if let Some(think) = needle::extract_think(&result.text) {
+        println!("[Dusunce] {}", think);
+    }
+
+    // Tool call'ları ayrıştır ve çalıştır
+    if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
+        if tool_calls.is_empty() {
+            println!("Model bos tool call dondurdu.");
+            return Ok(());
+        }
+
+        for call in tool_calls {
+            let name = call["name"].as_str().unwrap_or("bilinmeyen");
+            let args = &call["arguments"];
+
+            println!("\n=== ARAC: {} ===", name);
+            println!("Argumanlar: {}\n", args);
+
+            match name {
+                "web_search" => {
+                    if let Some(query) = args["query"].as_str() {
+                        match search::web_search(query) {
+                            Ok(r) => {
+                                println!("=== ARAMA SONUCLARI ===");
+                                println!("{}", r);
+                            }
+                            Err(e) => eprintln!("Arama hatasi: {}", e),
+                        }
+                    }
+                }
+                "read_url" => {
+                    if let Some(url) = args["url"].as_str() {
+                        match reader::read_url(url) {
+                            Ok(content) => {
+                                println!("=== SAYFA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Okuma hatasi: {}", e),
+                        }
+                    }
+                }
+                "read_file" => {
+                    if let Some(path) = args["path"].as_str() {
+                        match file_ops::read_file(path) {
+                            Ok(content) => {
+                                println!("=== DOSYA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Dosya okuma hatasi: {}", e),
+                        }
+                    }
+                }
+                "write_file" => {
+                    if let (Some(path), Some(content)) =
+                        (args["path"].as_str(), args["content"].as_str())
+                    {
+                        match file_ops::write_file(path, content) {
+                            Ok(msg) => println!("{}", msg),
+                            Err(e) => eprintln!("Dosya yazma hatasi: {}", e),
+                        }
+                    }
+                }
+                "list_dir" => {
+                    let path = args["path"].as_str().unwrap_or(".");
+                    match file_ops::list_dir(path) {
+                        Ok(listing) => {
+                            println!("=== DIZIN ICERIGI ===");
+                            println!("{}", listing);
+                        }
+                        Err(e) => eprintln!("Dizin listeleme hatasi: {}", e),
+                    }
+                }
+                _ => {
+                    eprintln!("Bilinmeyen arac: {}", name);
+                }
+            }
+        }
+    } else {
+        println!("Model bir tool call uretmedi.");
+    }
+
+    println!("\n=== ISLEM TAMAMLANDI ===");
+
+    Ok(())
+}
+```
+
+### 📝 `src/tools/sandbox.rs` — Testler Ekle
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_safe_path_simple() {
+        let result = safe_path("test.txt");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_safe_path_rejects_parent_dir() {
+        let result = safe_path("../etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_safe_path_rejects_absolute() {
+        let result = safe_path("/etc/passwd");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_safe_path_rejects_empty() {
+        let result = safe_path("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_safe_path_rejects_windows_absolute() {
+        let result = safe_path("C:\\Windows\\System32");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_safe_path_with_subdir() {
+        let result = safe_path("subdir/test.txt");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_auto_approve_default() {
+        // Varsayılan olarak kapalı
+        set_auto_approve(false);
+        assert!(!is_auto_approve());
+    }
+
+    #[test]
+    fn test_auto_approve_enable() {
+        set_auto_approve(true);
+        assert!(is_auto_approve());
+        // Test sonrası sıfırla
+        set_auto_approve(false);
+    }
+
+    #[test]
+    fn test_ask_approval_auto_mode() {
+        set_auto_approve(true);
+        assert!(ask_approval("test", "detay"));
+        set_auto_approve(false);
+    }
+}
+```
+
+### 📝 `src/tools/file_ops.rs` — Testleri Güncelle
+
+`write_file` testlerini güncelle (onay modu nedeniyle):
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tools::sandbox;
+
+    fn setup_auto_approve() {
+        sandbox::set_auto_approve(true);
+    }
+
+    #[test]
+    fn test_write_and_read_file() {
+        setup_auto_approve();
+        let content = "Merhaba, dunya!";
+        let write_result = write_file("test_write_read.txt", content);
+        assert!(write_result.is_ok());
+
+        let read_result = read_file("test_write_read.txt");
+        assert!(read_result.is_ok());
+        assert_eq!(read_result.unwrap(), content);
+
+        let _ = std::fs::remove_file("workspace/test_write_read.txt");
+    }
+
+    #[test]
+    fn test_write_file_with_subdir() {
+        setup_auto_approve();
+        let result = write_file("subdir/test.txt", "content");
+        assert!(result.is_ok());
+
+        let read_result = read_file("subdir/test.txt");
+        assert!(read_result.is_ok());
+
+        let _ = std::fs::remove_file("workspace/subdir/test.txt");
+        let _ = std::fs::remove_dir("workspace/subdir");
+    }
+
+    #[test]
+    fn test_read_nonexistent_file() {
+        let result = read_file("nonexistent_file_xyz.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_file_rejects_path_traversal() {
+        setup_auto_approve();
+        let result = write_file("../outside.txt", "content");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_file_rejects_absolute() {
+        setup_auto_approve();
+        let result = write_file("/tmp/outside.txt", "content");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_write_file_rejects_too_large() {
+        setup_auto_approve();
+        let big_content = "x".repeat(2_000_000);
+        let result = write_file("big.txt", &big_content);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_dir_empty() {
+        let result = list_dir(".");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_list_dir_nonexistent() {
+        let result = list_dir("nonexistent_dir_xyz");
+        assert!(result.is_err());
+    }
+}
+```
+
+### 🚀 Sıra
+
+1. **`sandbox.rs`'e onay modülünü ekle**
+2. **`file_ops.rs`'de `write_file`'a onay ekle**
+3. **`main.rs`'e `--auto-approve` flag'i ekle**
+4. **Testleri güncelle**
+5. **Test et:**
+   ```powershell
+   cargo fmt --all
+   cargo clippy --all-targets -- -D warnings
+   cargo test
+   ```
+6. **Manuel test:**
+   ```powershell
+   # Onay sormadan çalıştır (auto-approve)
+   cargo run --release -- --auto-approve "Search the web for Rust news"
+
+   # Onay sorarak çalıştır (varsayılan)
+   cargo run --release -- "Write a test file"
+   ```
+7. **Commit + Push:**
+   ```powershell
+   git add .
+   git commit -m "feat(security): add user approval for write_file operations"
+   git push origin main
+   ```
+
+## 🔒 Güvenlik
+
+### Dosya Yazma Onayı
+
+`write_file` aracı, varsayılan olarak **kullanıcı onayı** ister:
+
+```bash
+cargo run --release -- "Write a note to notes.txt"
+# Çıktı:
+# === ONAY GEREKLI ===
+# Islem: Dosya Yazma
+# Detay: Dosya: notes.txt
+# Icerik: ...
+# Onaylıyor musunuz? (e/h):
+```
+
+Otomatik onay modu (script/CI için):
+
+```bash
+cargo run --release -- --auto-approve "Write a note to notes.txt"
+```
+
+### Sandbox
+
+Tüm dosya işlemleri `./workspace/` dizini içinde sınırlıdır:
+- Path traversal (`..`) reddedilir
+- Absolute path reddedilir
+- Maksimum dosya boyutu: 1 MB
+```
+
 ## 📖 Dokümantasyon
 
 - [Mimari](docs/ARCHITECTURE.md)
