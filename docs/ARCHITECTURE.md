@@ -2,21 +2,18 @@
 
 ## Genel Bakış
 
-CactAgent, iki küçük dil modelini tek bir Rust binary'sinde birleştirir. Hiçbir ayrı sunucu, Python bağımlılığı veya harici API yoktur.
+CactAgent, tek bir küçük dil modeli (Needle v2) ve bir dizi aracı tek bir Rust binary'sinde birleştirir. Hiçbir ayrı sunucu, Python bağımlılığı veya harici API yoktur.
 
 ## Bileşenler
 
-### 1. Engine Katmanı (`src/engine/`)
+### 1. Engine Katmanı (`src/engine/needle.rs`)
 
 **Needle v2 (13 MB)**
 - Görev: Doğal dildeki kullanıcı isteğini araç çağrısına dönüştürmek
 - Çıktı: `<tool_call>[{"name":"...","arguments":{...}}]</tool_call>`
 - Kullanım: `needle_engine.run(task, tools_json)`
 
-**Qwen2.5-0.5B (~350 MB)**
-- Görev: Metin özetleme, yanıt üretme
-- Çıktı: Serbest metin
-- Kullanım: `summarize_with_qwen(content)`
+Needle, **sadece araç seçimi** için eğitilmiş özel bir modeldir. Metin üretmez, özet yapmaz. Tek işi: kullanıcı niyetini anlayıp doğru aracı seçmek.
 
 ### 2. Tools Katmanı (`src/tools/`)
 
@@ -28,19 +25,18 @@ Her araç bir fonksiyon olarak tanımlanır ve JSON şeması ile modele sunulur.
 - Çıktı: Başlık + URL + snippet listesi
 
 **read_url(url)**
-- Sayfayı indirir, HTML'i temizler
-- `<article>`, `<main>`, `<body>` önceliği
+- Sayfayı indirir, readability ile ana içeriği çıkarır
+- Fallback: yoğunluk bazlı HTML temizleme
 - Cümle sonunda akıllıca keser (3000 karakter)
 
-### 3. Agent Katmanı (`src/agent.rs`)
+### 3. Ana Akış (`src/main.rs`)
 
-Şu an doğrusal bir akış:
+Doğrusal, kontrollü bir akış:
 1. Kullanıcı isteği → Needle → araç çağrısı
 2. Araç çalıştır → sonuç
-3. Sonuç → Qwen → özet
-4. Özet → kullanıcı
+3. Sonuç → kullanıcıya ham metin
 
-Gelecekte: Çok adımlı döngü (ReAct pattern).
+**Özetleme yok.** Model uydurmuyor, sadece gerçek metin sunuluyor.
 
 ## Veri Akışı
 
@@ -53,29 +49,44 @@ web_search: DuckDuckGo → 5 sonuç
     ↓
 İlk URL: https://blog.rust-lang.org/
     ↓
-read_url: 96 KB HTML → 2957 karakter temiz metin
+read_url: 96 KB HTML → readability → 3 KB temiz metin
     ↓
-Qwen: "This is the main Rust blog..."
-    ↓
-Kullanıcı: Özet
+Kullanıcı: Ham, gerçek metin
 ```
 
 ## Bağımlılıklar
 
 | Crate | Amaç | Boyut |
 |-------|------|-------|
-| `needle-infer` | Needle modeli yükleme | Küçük |
-| `candelabra` | Qwen yükleme + çıkarım | Orta |
-| `reqwest` | HTTP istekleri | Orta |
+| `needle-infer` | Needle modeli yükleme ve çıkarım | Küçük |
+| `reqwest` | HTTP istekleri (native-tls) | Orta |
 | `scraper` | HTML ayrıştırma | Küçük |
+| `readability` | Ana içerik çıkarımı | Küçük |
 | `hf-hub` | Model indirme | Küçük |
+| `url` | URL ayrıştırma | Küçük |
 
 ## Performans
 
-| İşlem | Süre (CPU) | Süre (GPU, tahmini) |
-|-------|-----------|---------------------|
-| Needle araç seçimi | ~50 ms | ~10 ms |
-| Web araması | ~2 sn | ~2 sn |
-| URL okuma | ~2 sn | ~2 sn |
-| Qwen özet (50 token) | ~6 sn | ~1 sn |
-| **Toplam** | **~10 sn** | **~5 sn** |
+| İşlem | Süre (CPU) |
+|-------|-----------|
+| Needle araç seçimi | ~50 ms |
+| Web araması | ~2 sn |
+| URL okuma (readability) | ~2 sn |
+| **Toplam** | **~4-5 sn** |
+
+## Tasarım Kararları
+
+### Neden Qwen2.5-0.5B kaldırıldı?
+
+Sistem ilk sürümünde iki model kullanıyordu: Needle (araç seçimi) + Qwen2.5-0.5B (özetleme). Ancak:
+
+1. **Halüsinasyon:** Qwen2.5-0.5B, özetleme görevinde sık sık kaynakta olmayan bilgiler uyduruyordu.
+2. **Tekrar döngüsü:** Düşük temperature'da aynı cümleyi tekrar ediyordu.
+3. **Bellek:** ~400 MB ek bellek kullanımı, E2 Micro gibi kısıtlı cihazlarda sorun yaratıyordu.
+4. **Değer katmıyordu:** Ürettiği özetler, ham metinden daha az bilgi içeriyordu.
+
+**Sonuç:** Qwen kaldırıldı, sistem sadece Needle + araçlar üzerine odaklandı. Bu, "en düşük donanımda en hızlı çalışan" hedefine daha uygun.
+
+### Özet modeli opsiyonel olarak geri gelebilir
+
+Gelecekte, E2 Micro'da çalışabilecek **daha küçük** (100-200 MB) bir özet modeli veya **daha iyi prompt** ile Qwen2.5-0.5B, `feature = "summarize"` flag'i arkasında opsiyonel olarak eklenebilir.

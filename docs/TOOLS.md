@@ -28,7 +28,7 @@ pub mod my_tool;
 
 ### 3. JSON Şemasını Tanımla
 
-`main.rs`'deki `TOOLS_JSON` sabitine ekle:
+`src/tools/mod.rs`'daki `TOOLS_JSON` sabitine ekle:
 
 ```json
 {
@@ -46,7 +46,7 @@ pub mod my_tool;
 
 ### 4. Çağrıyı İşle
 
-`main.rs`'deki `match name` bloğuna ekle:
+`src/main.rs`'deki `match name` bloğuna ekle:
 
 ```rust
 "my_tool" => {
@@ -74,29 +74,55 @@ pub mod my_tool;
 {"name":"web_search","arguments":{"query":"Rust programming language"}}
 ```
 
+**Notlar:**
+- DuckDuckGo HTML arayüzü kullanılır
+- Retry: 3 deneme, 2 sn arayla
+- `ConnectionReset` hatalarına karşı dayanıklı
+
 ### read_url
 
-**Amaç:** Bir URL'nin içeriğini okumak
+**Amaç:** Bir URL'nin içeriğini okumak ve temizlemek
 
 **Parametreler:**
 - `url` (string): Okunacak URL
 
-**Çıktı:** Temizlenmiş metin (max 3000 karakter)
+**Çıktı:** Temizlenmiş metin (max 3000 karakter, cümle sonunda kesilir)
 
 **Örnek:**
 ```json
 {"name":"read_url","arguments":{"url":"https://blog.rust-lang.org/"}}
 ```
 
+**Notlar:**
+- Önce `readability` denenir, başarısız olursa yoğunluk bazlı fallback
+- Breadcrumb, menü, reklam temizlenir
+- Cümle sonunda akıllıca kesilir
+
 ## Gelecek Araçlar
+
+### read_file
+
+**Amaç:** Sandbox'lı dizinden dosya okumak
+
+**Parametreler:**
+- `path` (string): `./workspace/` içindeki dosya yolu
+
+**Güvenlik:**
+- Path traversal koruması (`..` yasak)
+- Sadece `./workspace/` dizini
 
 ### write_file
 
-**Amaç:** Dosyaya içerik yazmak
+**Amaç:** Sandbox'lı dizine dosya yazmak
 
 **Parametreler:**
-- `path` (string): Dosya yolu
+- `path` (string): `./workspace/` içindeki dosya yolu
 - `content` (string): Yazılacak içerik
+
+**Güvenlik:**
+- Path traversal koruması
+- Sadece `./workspace/` dizini
+- Kullanıcı onayı (opsiyonel)
 
 ### run_command
 
@@ -105,4 +131,10 @@ pub mod my_tool;
 **Parametreler:**
 - `command` (string): Çalıştırılacak komut
 
-**Uyarı:** Güvenlik riski! Sadece güvenilir ortamlarda kullanın.
+**Güvenlik:**
+- **Whitelist bazlı izin sistemi** (sadece belirli komutlar)
+- Shell injection koruması
+- Çalışma dizini sınırlaması
+- Timeout
+
+**Uyarı:** Bu araç en son eklenecek ve güvenlik incelemesinden geçecek.

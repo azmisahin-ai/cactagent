@@ -1,20 +1,19 @@
 # CactAgent 🦀🌵
 
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)]()
+
 **Tamamen yerel, tek binary'lik AI ajanı.** Sunucu yok, API anahtarı yok, bulut yok. Sadece Rust.
 
-CactAgent, iki küçük dil modelini tek bir Rust binary'sinde birleştirir:
-- **Needle v2** (13 MB) — Araç seçimi ve görev planlama
-- **Qwen2.5-0.5B** (~350 MB) — Metin özetleme ve yanıt üretme
-
-İnternete çıkıp arama yapabilir, sayfaları okuyabilir ve öğrendiklerini özetleyebilir. Hepsi CPU'da, hepsi yerel.
+CactAgent, 13 MB'lık bir dil modeli (Needle v2) ve bir dizi aracı tek bir Rust binary'sinde birleştirir. İnternete çıkıp arama yapabilir, sayfaları okuyabilir ve size ham, temiz metin sunar. Hepsi CPU'da, hepsi yerel.
 
 ## ✨ Özellikler
 
 - 🏠 **Tamamen yerel** — Hiçbir veri cihazından çıkmaz
 - 📦 **Tek binary** — Ayrı sunucu, Docker, Python bağımlılığı yok
-- 🚀 **Hızlı** — CPU'da 10+ token/s, GPU ile 50+ token/s
+- 🚀 **Hafif** — Sadece ~10 MB binary, ~50 MB RAM
+- ⚡ **Hızlı** — CPU'da milisaniyeler içinde araç seçimi
 - 🔧 **Genişletilebilir** — Yeni araçlar eklemek 10 satır kod
-- 📱 **Mobil hazır** — Candle + Vulkan/Metal desteği
+- 📱 **Mobil hazır** — E2 Micro, Raspberry Pi ve mobil cihazlarda çalışır
 - 🆓 **Ücretsiz** — API anahtarı gerekmez
 
 ## 🚀 Hızlı Başlangıç
@@ -22,12 +21,12 @@ CactAgent, iki küçük dil modelini tek bir Rust binary'sinde birleştirir:
 ### Gereksinimler
 
 - Rust 1.70+
-- İnternet bağlantısı (ilk çalıştırmada modelleri indirmek için)
+- İnternet bağlantısı (ilk çalıştırmada modeli indirmek için)
 
 ### Kurulum
 
 ```bash
-git clone https://github.com/alen/cactagent
+git clone https://github.com/azmisahin-ai/cactagent
 cd cactagent
 cargo build --release
 ```
@@ -38,24 +37,32 @@ cargo build --release
 cargo run --release -- "Rust programlama dili hakkında son haberleri araştır"
 ```
 
-İlk çalıştırmada modeller otomatik indirilecek (~400 MB). Sonraki çalıştırmalarda hazır olacak.
+İlk çalıştırmada Needle modeli otomatik indirilecek (~13 MB). Sonraki çalıştırmalarda hazır olacak.
 
 ## 🏗️ Mimari
+
+CactAgent, tek bir küçük model (Needle v2, 13 MB) ve araçlar üzerine kuruludur:
 
 ```
 ┌─────────────────────────────────────────────────┐
 │              CactAgent (Rust binary)            │
 │                                                 │
-│  ┌─────────────┐    ┌──────────────────────┐   │
-│  │ Needle v2   │    │ Qwen2.5-0.5B         │   │
-│  │ Araç seçimi │    │ Metin üretimi        │   │
-│  └─────────────┘    └──────────────────────┘   │
+│  ┌─────────────┐                                │
+│  │ Needle v2   │  Kullanıcı niyetini anlar      │
+│  │ (13 MB)     │  ve doğru aracı seçer          │
+│  └─────────────┘                                │
 │                                                 │
 │  ┌──────────────────────────────────────────┐  │
-│  │ Tools: web_search, read_url, ...          │  │
+│  │ Tools: web_search, read_url              │  │
 │  └──────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────┘
 ```
+
+**Veri akışı:**
+1. Kullanıcı sorusu → Needle → araç çağrısı
+2. `web_search` → DuckDuckGo → sonuçlar
+3. `read_url` → readability → temiz metin
+4. Kullanıcıya ham, doğru metin sunulur (uydurma yok)
 
 Detaylı mimari için: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -63,23 +70,24 @@ Detaylı mimari için: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 | Araç | Açıklama | Durum |
 |------|----------|-------|
-| `web_search` | DuckDuckGo üzerinden arama | ✅ |
-| `read_url` | Sayfa içeriğini oku ve temizle | ✅ |
-| `write_file` | Dosyaya yaz | 🚧 Planlı |
-| `read_file` | Dosyadan oku | 🚧 Planlı |
-| `run_command` | Terminal komutu çalıştır | 🚧 Planlı |
+| `web_search` | DuckDuckGo üzerinden gerçek arama | ✅ |
+| `read_url` | Sayfa içeriğini oku ve readability ile temizle | ✅ |
+| `read_file` | Dosyadan oku (sandbox'lı) | 🚧 Planlı |
+| `write_file` | Dosyaya yaz (sandbox'lı) | 🚧 Planlı |
+| `run_command` | Terminal komutu (whitelist ile) | 🚧 Planlı |
 
 ## 🗺️ Yol Haritası
 
 - [x] Needle v2 ile araç seçimi
-- [x] Qwen2.5-0.5B ile metin özetleme
-- [x] DuckDuckGo arama
-- [x] URL okuma ve temizleme
-- [ ] Dosya sistemi araçları
+- [x] DuckDuckGo ile gerçek arama
+- [x] URL okuma ve readability ile temizleme
+- [x] Otomatik model indirme
+- [x] Retry mekanizması (bağlantı hatalarına karşı)
+- [ ] CI + test altyapısı
+- [ ] Dosya sistemi araçları (sandbox'lı)
 - [ ] Çok adımlı görev döngüsü
-- [ ] CUDA/Metal GPU desteği
-- [ ] Mobil portu (Android/iOS)
-- [ ] WebAssembly derlemesi
+- [ ] E2 Micro / mobil optimizasyonu
+- [ ] Opsiyonel: özet modeli (feature flag arkasında)
 - [ ] Kendi kendine geliştirme modu
 
 Detaylı yol haritası için: [docs/ROADMAP.md](docs/ROADMAP.md)
@@ -103,6 +111,6 @@ Katkılar memnuniyetle karşılanır! Lütfen [CONTRIBUTING.md](CONTRIBUTING.md)
 ## 🙏 Teşekkürler
 
 - [Needle](https://huggingface.co/Cactus-Compute/needle2) — Araç seçimi modeli
-- [Qwen2.5](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct) — Metin üretim modeli
 - [Candle](https://github.com/huggingface/candle) — Rust ML framework
-- [candelabra](https://crates.io/crates/candelabra) — Yüksek seviyeli çıkarım API'si
+- [readability](https://crates.io/crates/readability) — Metin çıkarımı
+- [scraper](https://crates.io/crates/scraper) — HTML ayrıştırma
