@@ -47,9 +47,8 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
     let snippet_selector = Selector::parse(".result__snippet").unwrap();
 
     let mut output = String::new();
-    let mut count = 0;
 
-    for result in document.select(&result_selector) {
+    for (count, result) in document.select(&result_selector).enumerate() {
         if count >= 5 {
             break;
         }
@@ -82,7 +81,6 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
             clean_url,
             snippet
         ));
-        count += 1;
     }
 
     if output.is_empty() {
@@ -101,4 +99,16 @@ fn clean_ddg_url(raw_url: &str) -> String {
         }
     }
     raw_url.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_ddg_url() {
+        let raw = "//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.rust-lang.org%2F&rut=...";
+        let cleaned = clean_ddg_url(raw);
+        assert_eq!(cleaned, "https://blog.rust-lang.org/");
+    }
 }

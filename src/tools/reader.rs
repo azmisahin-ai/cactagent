@@ -165,7 +165,7 @@ fn smart_truncate(text: &str, max_chars: usize) -> String {
     let truncated: String = text.chars().take(max_chars).collect();
 
     let last_sentence_end = truncated
-        .rfind(|c| c == '.' || c == '!' || c == '?')
+        .rfind(['.', '!', '?'])
         .map(|i| i + 1)
         .unwrap_or(truncated.len());
 

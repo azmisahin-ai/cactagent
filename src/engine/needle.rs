@@ -52,3 +52,23 @@ pub fn ensure_model() -> String {
     println!("[DEBUG] Model kopyalandi: {}", path);
     path.to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_tool_call() {
+        let input = "<tool_call>[{\"name\":\"web_search\",\"arguments\":{\"query\":\"test\"}}]</tool_call>";
+        let calls = parse_tool_call(input).unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0]["name"], "web_search");
+    }
+
+    #[test]
+    fn test_extract_think() {
+        let input = "<think>test thinking</think><tool_call>[]</tool_call>";
+        let think = extract_think(input).unwrap();
+        assert_eq!(think, "test thinking");
+    }
+}
