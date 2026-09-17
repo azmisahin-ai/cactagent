@@ -49,7 +49,9 @@ fn main() {
     println!("    match name {{");
     println!("        \"my_tool\" => {{");
     println!("            if let Some(param) = args[\"param\"].as_str() {{");
-    println!("                my_tool::my_tool(param).unwrap_or_else(|e| format!(\"Hata: {{}}\", e))");
+    println!(
+        "                my_tool::my_tool(param).unwrap_or_else(|e| format!(\"Hata: {{}}\", e))"
+    );
     println!("            }} else {{");
     println!("                \"Hata: param eksik\".to_string()");
     println!("            }}");

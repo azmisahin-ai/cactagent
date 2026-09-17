@@ -1,6 +1,6 @@
 [package]
 name = "cactagent"
-version = "0.2.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["Azmi Şahin <azmisahin@outlook.com>"]
 description = "A fully local AI agent contained in a single binary."
@@ -28,9 +28,3 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
-
-[lints.rust]
-unsafe_code = "forbid"
-
-[lints.clippy]
-all = "warn"
