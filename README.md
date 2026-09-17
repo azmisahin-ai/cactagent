@@ -96,6 +96,24 @@ Detaylı mimari için: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 Detaylı yol haritası için: [docs/ROADMAP.md](docs/ROADMAP.md)
 
+## 📚 Örnekler
+
+`examples/` klasöründe çalıştırılabilir örnekler bulunur:
+
+```bash
+# Basit web araması
+cargo run --example basic_search -- "Rust programming"
+
+# URL okuma
+cargo run --example read_url -- "https://blog.rust-lang.org/"
+
+# Dosya işlemleri
+cargo run --example file_ops
+
+# Yeni araç ekleme rehberi
+cargo run --example custom_tool
+```
+
 ## 📖 Dokümantasyon
 
 - [Mimari](docs/ARCHITECTURE.md)
