@@ -1,0 +1,25 @@
+[package]
+name = "cactagent"
+version = "0.1.0"
+edition = "2021"
+authors = ["azmisahin"]
+description = "A fully local, self-contained AI agent in Rust. No servers, no APIs, just a single binary."
+license = "MIT"
+repository = "https://github.com/alen/cactagent"
+keywords = ["ai", "agent", "llm", "local", "rust"]
+categories = ["command-line-utilities", "science"]
+
+[dependencies]
+needle-infer = "0.2.1"
+candelabra = "0.2.0"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde_json = "1"
+urlencoding = "2"
+scraper = "0.22"
+hf-hub = "0.5"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
