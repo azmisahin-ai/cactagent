@@ -33,3 +33,6 @@ target
 .DS_Store
 
 /workspace/
+/workspace/logs/
+/workspace/*.txt
+/workspace/*.log
