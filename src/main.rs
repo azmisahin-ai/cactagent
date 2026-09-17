@@ -1,16 +1,32 @@
 use cactagent::engine::needle;
+use cactagent::tools::sandbox;
 use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CLI argümanlarını al
     let args: Vec<String> = std::env::args().collect();
-    let user_task = if args.len() > 1 {
-        args[1..].join(" ")
+
+    // --auto-approve flag'ini kontrol et
+    let auto_approve = args.iter().any(|a| a == "--auto-approve");
+    if auto_approve {
+        sandbox::set_auto_approve(true);
+        println!("[!] Otomatik onay modu aktif. Dosya yazma onayi sorulmayacak.\n");
+    }
+
+    // Flag'leri temizle
+    let filtered_args: Vec<String> = args
+        .iter()
+        .filter(|a| !a.starts_with("--"))
+        .cloned()
+        .collect();
+
+    let user_task = if filtered_args.len() > 1 {
+        filtered_args[1..].join(" ")
     } else {
         "Search the web for the latest news about Rust programming language".to_string()
     };
 
-    println!("=== CactAgent v0.6.0 ===");
+    println!("=== CactAgent v0.7.0 ===");
     println!("Gorev: {}\n", user_task);
 
     // Needle modelini yükle

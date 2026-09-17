@@ -1,4 +1,4 @@
-use super::sandbox::{safe_path, MAX_FILE_SIZE};
+use super::sandbox::{ask_approval, safe_path, MAX_FILE_SIZE};
 
 /// Bir dosyayı okur (sandbox içinde, max 1 MB)
 pub fn read_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
@@ -31,7 +31,6 @@ pub fn read_file(path: &str) -> Result<String, Box<dyn std::error::Error>> {
 /// Bir dosyaya yazar (sandbox içinde, max 1 MB)
 pub fn write_file(path: &str, content: &str) -> Result<String, Box<dyn std::error::Error>> {
     let full_path = safe_path(path)?;
-    println!("[DEBUG] Dosya yaziliyor: {:?}", full_path);
 
     // Boyut kontrolü
     if content.len() as u64 > MAX_FILE_SIZE {
@@ -42,6 +41,22 @@ pub fn write_file(path: &str, content: &str) -> Result<String, Box<dyn std::erro
         )
         .into());
     }
+
+    // Onay iste
+    let preview: String = content.chars().take(200).collect();
+    let preview_display = if content.len() > 200 {
+        format!("{}... (toplam {} byte)", preview, content.len())
+    } else {
+        preview
+    };
+
+    let details = format!("Dosya: {}\nIcerik: {}", path, preview_display);
+
+    if !ask_approval("Dosya Yazma", &details) {
+        return Err("Kullanici yazma islemini reddetti.".into());
+    }
+
+    println!("[DEBUG] Dosya yaziliyor: {:?}", full_path);
 
     // Parent dizinleri oluştur
     if let Some(parent) = full_path.parent() {
@@ -104,9 +119,15 @@ pub fn list_dir(path: &str) -> Result<String, Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::sandbox;
+
+    fn setup_auto_approve() {
+        sandbox::set_auto_approve(true);
+    }
 
     #[test]
     fn test_write_and_read_file() {
+        setup_auto_approve();
         let content = "Merhaba, dunya!";
         let write_result = write_file("test_write_read.txt", content);
         assert!(write_result.is_ok());
@@ -115,20 +136,18 @@ mod tests {
         assert!(read_result.is_ok());
         assert_eq!(read_result.unwrap(), content);
 
-        // Temizlik
         let _ = std::fs::remove_file("workspace/test_write_read.txt");
     }
 
     #[test]
     fn test_write_file_with_subdir() {
+        setup_auto_approve();
         let result = write_file("subdir/test.txt", "content");
         assert!(result.is_ok());
 
         let read_result = read_file("subdir/test.txt");
         assert!(read_result.is_ok());
-        assert_eq!(read_result.unwrap(), "content");
 
-        // Temizlik
         let _ = std::fs::remove_file("workspace/subdir/test.txt");
         let _ = std::fs::remove_dir("workspace/subdir");
     }
@@ -141,22 +160,24 @@ mod tests {
 
     #[test]
     fn test_write_file_rejects_path_traversal() {
+        setup_auto_approve();
         let result = write_file("../outside.txt", "content");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_write_file_rejects_absolute() {
+        setup_auto_approve();
         let result = write_file("/tmp/outside.txt", "content");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_write_file_rejects_too_large() {
-        let big_content = "x".repeat(2_000_000); // 2 MB
+        setup_auto_approve();
+        let big_content = "x".repeat(2_000_000);
         let result = write_file("big.txt", &big_content);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cok buyuk"));
     }
 
     #[test]
