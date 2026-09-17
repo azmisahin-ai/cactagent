@@ -42,6 +42,33 @@ cargo run --release -- "Rust programlama dili hakkında son haberleri araştır"
 
 İlk çalıştırmada Needle modeli otomatik indirilecek (~13 MB). Sonraki çalıştırmalarda hazır olacak.
 
+## 🚀 Kullanım
+
+### Yardım
+
+```bash
+cactagent --help
+```
+
+### Sürüm
+
+```bash
+cactagent --version
+```
+
+### Otomatik Onay (Script/CI için)
+
+```bash
+cactagent --auto-approve "Write 'test' to test.txt"
+```
+
+### Normal Kullanım
+
+```bash
+cactagent "Rust programlama dili hakkında son haberleri araştır"
+cactagent "Write 'Merhaba dunya' to notes.txt"
+```
+
 ## 🏗️ Mimari
 
 CactAgent, tek bir küçük model (Needle v2, 13 MB) ve araçlar üzerine kuruludur:
