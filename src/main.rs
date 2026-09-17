@@ -1,4 +1,4 @@
-use cactagent::engine::{needle, qwen};
+use cactagent::engine::{needle};
 use cactagent::tools::{reader, search, TOOLS_JSON};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,19 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             match reader::read_url(&url) {
                 Ok(content) => {
-                    println!("=== SAYFA ICERIGI (ilk 500 karakter) ===");
-                    let preview: String = content.chars().take(500).collect();
-                    println!("{}\n", preview);
-
-                    // ADIM 4: Qwen ile özetle
-                    println!("=== ADIM 4: QWEN ILE OZETLENIYOR ===");
-                    match qwen::summarize(&content) {
-                        Ok(summary) => {
-                            println!("\n=== OZET ===");
-                            println!("{}", summary);
-                        }
-                        Err(e) => eprintln!("Ozet hatasi: {}", e),
-                    }
+                    println!("\n=== SAYFA ICERIGI ===\n");
+                    println!("{}", content);
                 }
                 Err(e) => eprintln!("Okuma hatasi: {}", e),
             }

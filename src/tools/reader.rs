@@ -1,36 +1,68 @@
 use scraper::{Html, Selector};
+use std::io::Cursor;
 
 pub fn read_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     println!("[DEBUG] URL okunuyor: {}", url);
 
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .timeout(std::time::Duration::from_secs(30))
         .build()?;
 
-    let response = client.get(url).send()?;
-    println!("[DEBUG] Yanit status: {}", response.status());
-
-    let body = response.text()?;
+    let body = client.get(url).send()?.text()?;
     println!("[DEBUG] Body uzunlugu: {} karakter", body.len());
 
-    let document = Html::parse_document(&body);
+    // Önce readability dene
+    let extracted = match readability_extract(&body, url) {
+        Ok(text) if !text.trim().is_empty() => {
+            println!("[DEBUG] Readability basarili: {} karakter", text.len());
+            text
+        }
+        Ok(_) => {
+            println!("[DEBUG] Readability bos dondu, fallback kullaniliyor");
+            extract_with_density(&body)?
+        }
+        Err(e) => {
+            println!("[DEBUG] Readability basarisiz: {}, fallback kullaniliyor", e);
+            extract_with_density(&body)?
+        }
+    };
 
+    let cleaned = clean_text(&extracted);
+    let truncated = smart_truncate(&cleaned, 3000);
+
+    Ok(truncated)
+}
+
+// readability crate'ini dogru API ile cagirir
+fn readability_extract(html: &str, url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // URL'yi parse et
+    let parsed_url: url::Url = url.parse()?;
+
+    // HTML'i mutable cursor'a sar
+    let mut cursor = Cursor::new(html.as_bytes());
+
+    // extract fonksiyonu &mut reader ve &Url ister
+    let article = readability::extractor::extract(&mut cursor, &parsed_url)?;
+
+    // article.content HTML olarak gelir, metne cevir
+    let doc = Html::parse_fragment(&article.content);
+    Ok(doc.root_element().text().collect::<Vec<_>>().join(" "))
+}
+
+// Fallback: yogunluk bazli cikarim
+fn extract_with_density(body: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let document = Html::parse_document(body);
     let remove_selector = Selector::parse(
-        "script, style, nav, header, footer, aside, form, iframe, svg, noscript, \
-         .sidebar, .menu, .nav, .footer, .header, .advertisement, .ad, .ads, \
-         .cookie, .popup, .modal, .comments, .social, .share",
-    )
-    .unwrap();
+        "script, style, nav, header, footer, aside, form, iframe, svg, noscript",
+    ).unwrap();
 
-    let mut clean_html = body.clone();
+    let mut clean_html = body.to_string();
     for element in document.select(&remove_selector) {
-        let element_html = element.html();
-        clean_html = clean_html.replace(&element_html, "");
+        clean_html = clean_html.replace(&element.html(), "");
     }
 
     let clean_doc = Html::parse_document(&clean_html);
-
     let content_selectors = [
         "article",
         "main",
@@ -56,22 +88,7 @@ pub fn read_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
         }
     }
 
-    if best_text.is_empty() {
-        best_text = clean_doc.root_element().text().collect::<Vec<_>>().join(" ");
-    }
-
-    let cleaned = clean_text(&best_text);
-    let truncated = smart_truncate(&cleaned, 3000);
-
-    if truncated.is_empty() {
-        Ok("Sayfa icerigi okunamadi.".to_string())
-    } else {
-        println!(
-            "[DEBUG] Cikarilan metin uzunlugu: {} karakter",
-            truncated.len()
-        );
-        Ok(truncated)
-    }
+    Ok(best_text)
 }
 
 fn extract_text_from_element(element: &scraper::ElementRef) -> String {
@@ -98,6 +115,26 @@ fn extract_text_from_element(element: &scraper::ElementRef) -> String {
 
 fn clean_text(text: &str) -> String {
     let mut cleaned = text.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    // Breadcrumb ve navigasyon kalıplarını temizle
+    // "X » Y » Z" formatındaki breadcrumb'ları kaldır
+    // YENİ (pos değişkenini kaldır)
+    if cleaned.contains("» ") {
+        if let Some(last_arrow) = cleaned.rfind("» ") {
+            cleaned = cleaned[last_arrow + 3..].to_string();
+        }
+    }
+
+    // "Ana Sayfa", "Home", "Menu" gibi kalıpları baştan temizle
+    let noise_prefixes = [
+        "Ana Sayfa ", "Home ", "Menu ", "Skip to content ",
+        "Anasayfa ", "İçeriğe geç ",
+    ];
+    for prefix in &noise_prefixes {
+        if cleaned.starts_with(prefix) {
+            cleaned = cleaned[prefix.len()..].to_string();
+        }
+    }
 
     let lines: Vec<&str> = cleaned.lines().collect();
     let filtered: Vec<&str> = lines
