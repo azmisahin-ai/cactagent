@@ -2,12 +2,16 @@
 name = "cactagent"
 version = "0.1.0"
 edition = "2021"
-authors = ["azmisahin"]
-description = "A fully local, self-contained AI agent in Rust. No servers, no APIs, just a single binary."
-license = "MIT"
-repository = "https://github.com/alen/cactagent"
+authors = ["Azmi Şahin <azmisahin@outlook.com>"]
+description = "A fully local AI agent contained in a single binary."
+license = "AGPL-3.0"
+repository = "https://github.com/azmisahin-ai/cactagent"
 keywords = ["ai", "agent", "llm", "local", "rust"]
 categories = ["command-line-utilities", "science"]
+
+[[bin]]
+name = "cactagent"
+path = "src/main.rs"
 
 [dependencies]
 needle-infer = "0.2.1"

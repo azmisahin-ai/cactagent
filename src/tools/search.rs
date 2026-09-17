@@ -12,7 +12,6 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
         .connect_timeout(std::time::Duration::from_secs(15))
         .build()?;
 
-    // RETRY MEKANIZMASI: 3 kez dene, her denemede 2 saniye bekle
     let mut last_error: Option<Box<dyn std::error::Error>> = None;
     let mut body = String::new();
 
@@ -37,12 +36,10 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
         }
     }
 
-    // Tüm denemeler başarısız olduysa hata döndür
     if let Some(e) = last_error {
         return Err(e);
     }
 
-    // HTML'i ayrıştır
     let document = Html::parse_document(&body);
 
     let result_selector = Selector::parse(".result").unwrap();
@@ -57,22 +54,34 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
             break;
         }
 
-        let title = result.select(&title_selector).next()
+        let title = result
+            .select(&title_selector)
+            .next()
             .map(|e| e.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
 
-        let href = result.select(&title_selector).next()
+        let href = result
+            .select(&title_selector)
+            .next()
             .and_then(|e| e.value().attr("href"))
             .unwrap_or("")
             .to_string();
 
         let clean_url = clean_ddg_url(&href);
 
-        let snippet = result.select(&snippet_selector).next()
+        let snippet = result
+            .select(&snippet_selector)
+            .next()
             .map(|e| e.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
 
-        output.push_str(&format!("{}. {}\n   URL: {}\n   {}\n\n", count + 1, title, clean_url, snippet));
+        output.push_str(&format!(
+            "{}. {}\n   URL: {}\n   {}\n\n",
+            count + 1,
+            title,
+            clean_url,
+            snippet
+        ));
         count += 1;
     }
 
