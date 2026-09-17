@@ -5,6 +5,36 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [0.7.0] — 2026-09-17
+
+### Eklendi
+- `write_file` için kullanıcı onayı (`--auto-approve` ile atlanabilir)
+- Audit log (`workspace/logs/audit.log`) — tüm araç çağrıları kaydedilir
+- `--help` ve `--version` flag'leri
+- Hata mesajları iyileştirildi (kullanıcıya çözüm önerileri)
+- Pre-commit kontrol script'i (`scripts/pre-commit.ps1`)
+
+### Değişti
+- `sandbox.rs`'e onay modülü eklendi (`AUTO_APPROVE` atomic flag)
+- `main.rs`'de flag işleme basitleştirildi
+- README'ye güvenlik ve audit log bölümleri eklendi
+
+### Güvenlik
+- `write_file` artık varsayılan olarak onay ister
+- Path traversal, absolute path, Windows drive letter korumaları
+- Sandbox dışına çıkma girişimleri engellenir
+
+### Test
+- 39 test (3 yeni: onay modülü, audit log, leap year)
+
+### Bilinen Sorunlar
+- **DuckDuckGo rate limit (HTTP 202):** Yoğun kullanımda geçici olarak
+  çalışmaz. Kod tarafında retry + 5 sn bekleme var, ama yoğun kullanımda
+  birkaç dakika beklemek gerekebilir.
+- **Needle v2 (26M) sınırı:** Belirsiz ifadelerde olmayan araçları
+  uydurabiliyor (örneğin "Rust news" → "create_newsletter_item").
+  Bu, modelin parametre sınırından kaynaklanıyor, yazılım hatası değil.
+  Çözüm: Net ifadeler kullanmak.
 
 ## [0.6.0] — 2026-09-17
 
@@ -41,7 +71,7 @@ Sürümleme: [Semantic Versioning](https://semver.org/)
 - **DuckDuckGo rate limit:** Yoğun kullanımda 202 döndürüyor.
   Retry mekanizması ile kısmen çözüldü, tam çözüm için alternatif
   arama sağlayıcısı gerekli.
-  
+
 ## [0.4.0] — 2026-09-17
 
 ### Eklendi
@@ -59,6 +89,18 @@ Sürümleme: [Semantic Versioning](https://semver.org/)
 ### Değişti
 - README'ye CI, lisans, sürüm rozetleri eklendi
 - `docs/TOOLS.md` genişletildi
+
+## [0.3.0] — 2026-09-17
+
+### Eklendi
+- GitHub Actions CI workflow (`.github/workflows/ci.yml`)
+- `cargo fmt`, `cargo clippy`, `cargo test` otomatik kontrolleri
+- 21 test (needle parse, URL cleaning, text processing)
+- `examples/` klasörü (basic_search, read_url, file_ops, custom_tool)
+
+### Değişti
+- Test kapsamı genişletildi
+- README'ye CI rozeti eklendi
 
 ## [0.2.0] — 2026-09-17
 
