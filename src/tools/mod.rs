@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod file_ops;
 pub mod reader;
 pub mod sandbox;

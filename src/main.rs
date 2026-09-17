@@ -1,6 +1,6 @@
 use cactagent::engine::needle;
 use cactagent::tools::sandbox;
-use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
+use cactagent::tools::{audit, file_ops, reader, search, TOOLS_JSON};
 
 fn print_help() {
     println!("CactAgent v0.7.0 - Tamamen yerel AI ajani");
@@ -41,7 +41,6 @@ fn print_version() {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
-    // --help ve --version
     if args.iter().any(|a| a == "--help" || a == "-h") {
         print_help();
         return Ok(());
@@ -52,14 +51,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // --auto-approve
     let auto_approve = args.iter().any(|a| a == "--auto-approve");
     if auto_approve {
         sandbox::set_auto_approve(true);
         println!("[!] Otomatik onay modu aktif.\n");
     }
 
-    // Flag'leri temizle
     let filtered_args: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with("--"))
@@ -75,11 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== CactAgent v0.7.0 ===");
     println!("Gorev: {}\n", user_task);
 
-    // Needle modelini yükle
     let needle_path = needle::ensure_model();
     let needle_engine = needle::load(&needle_path);
 
-    // ADIM 1: Araç seçimi
     println!("=== ADIM 1: ARAC SECIMI ===");
     let result = needle_engine.run(&user_task, TOOLS_JSON);
 
@@ -91,7 +86,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[Dusunce] {}", think);
     }
 
-    // Tool call'ları ayrıştır ve çalıştır
     if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
         if tool_calls.is_empty() {
             println!("Model bos tool call dondurdu.");
@@ -105,24 +99,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("\n=== ARAC: {} ===", name);
             println!("Argumanlar: {}\n", args);
 
-            match name {
+            let tool_result: Result<String, String> = match name {
                 "web_search" => {
                     if let Some(query) = args["query"].as_str() {
                         match search::web_search(query) {
                             Ok(r) => {
                                 println!("=== ARAMA SONUCLARI ===");
                                 println!("{}", r);
+                                Ok(format!("{} sonuc", r.lines().count()))
                             }
-                            Err(e) => {
-                                eprintln!("Hata: Arama yapilamadi.");
-                                eprintln!("Sebep: {}", e);
-                                eprintln!();
-                                eprintln!("Olasi cozumler:");
-                                eprintln!("  - Internet baglantinizi kontrol edin");
-                                eprintln!("  - DuckDuckGo rate limit uyguluyor olabilir, birkac dakika bekleyin");
-                                eprintln!("  - Farkli bir sorgu deneyin");
-                            }
+                            Err(e) => Err(format!("Arama hatasi: {}", e)),
                         }
+                    } else {
+                        Err("'query' parametresi eksik".to_string())
                     }
                 }
                 "read_url" => {
@@ -131,9 +120,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Ok(content) => {
                                 println!("=== SAYFA ICERIGI ===");
                                 println!("{}", content);
+                                Ok(format!("{} karakter", content.len()))
                             }
-                            Err(e) => eprintln!("Okuma hatasi: {}", e),
+                            Err(e) => Err(format!("Okuma hatasi: {}", e)),
                         }
+                    } else {
+                        Err("'url' parametresi eksik".to_string())
                     }
                 }
                 "read_file" => {
@@ -142,9 +134,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Ok(content) => {
                                 println!("=== DOSYA ICERIGI ===");
                                 println!("{}", content);
+                                Ok(format!("{} karakter", content.len()))
                             }
-                            Err(e) => eprintln!("Dosya okuma hatasi: {}", e),
+                            Err(e) => Err(format!("Dosya okuma hatasi: {}", e)),
                         }
+                    } else {
+                        Err("'path' parametresi eksik".to_string())
                     }
                 }
                 "write_file" => {
@@ -152,9 +147,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         (args["path"].as_str(), args["content"].as_str())
                     {
                         match file_ops::write_file(path, content) {
-                            Ok(msg) => println!("{}", msg),
-                            Err(e) => eprintln!("Dosya yazma hatasi: {}", e),
+                            Ok(msg) => {
+                                println!("{}", msg);
+                                Ok(format!("{} byte yazildi", content.len()))
+                            }
+                            Err(e) => Err(format!("Dosya yazma hatasi: {}", e)),
                         }
+                    } else {
+                        Err("'path' ve 'content' parametreleri gerekli".to_string())
                     }
                 }
                 "list_dir" => {
@@ -163,14 +163,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(listing) => {
                             println!("=== DIZIN ICERIGI ===");
                             println!("{}", listing);
+                            Ok(format!("{} girdi", listing.lines().count()))
                         }
-                        Err(e) => eprintln!("Dizin listeleme hatasi: {}", e),
+                        Err(e) => Err(format!("Dizin listeleme hatasi: {}", e)),
                     }
                 }
-                _ => {
-                    eprintln!("Bilinmeyen arac: {}", name);
-                }
-            }
+                _ => Err(format!("Bilinmeyen arac: {}", name)),
+            };
+
+            // Audit log
+            let log_result = match &tool_result {
+                Ok(r) => r.clone(),
+                Err(e) => format!("HATA: {}", e),
+            };
+            audit::log_tool_call(name, &args.to_string(), &log_result);
         }
     } else {
         println!("Model bir tool call uretmedi.");
