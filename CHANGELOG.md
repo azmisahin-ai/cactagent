@@ -5,6 +5,34 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [0.2.0] — 2026-09-17
+
+### Değişti
+- **BREAKING:** Qwen2.5-0.5B bağımlılığı kaldırıldı
+- Odak: sadece Needle v2 + araçlar
+- Binary boyutu ~50 MB → ~10 MB
+- RAM kullanımı ~500 MB → ~50 MB
+- Derleme süresi ~2 dk → ~45 sn
+
+### Kaldırıldı
+- `candelabra` bağımlılığı
+- `engine/qwen.rs` modülü
+- Özetleme adımı (opsiyonel olarak geri gelebilir)
+
+### Eklendi
+- `readability` ile daha temiz metin çıkarımı
+- Breadcrumb ve navigasyon temizleme
+- `docs/ARCHITECTURE.md`'de tasarım kararları bölümü
+
+### Neden?
+Qwen2.5-0.5B, özetleme görevinde yeterince iyi değildi:
+- Halüsinasyon yapıyordu ("düşüncelerinizle birlikte doğru yerdesiniz" gibi)
+- Tekrar döngüsüne giriyordu (düşük temperature'da aynı cümleyi tekrarlıyordu)
+- E2 Micro gibi kısıtlı cihazlarda bellek sorunu yaratıyordu
+- Ürettiği özetler, ham metinden daha az bilgi içeriyordu
+
+Odak, "en düşük donanımda en hızlı çalışan" temel ajana kaydırıldı.
+
 ## [0.1.0] — 2026-09-17
 
 ### Eklendi
