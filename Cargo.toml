@@ -24,7 +24,8 @@ url = "2"
 hf-hub = "0.5"
 
 [profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-strip = true
+opt-level = "z"        # Boyut için optimize et (hız yerine)
+lto = true             # Link-time optimization
+codegen-units = 1      # Daha iyi optimizasyon
+strip = true           # Sembolleri kaldır
+panic = "abort"        # Panic yerine abort (daha küçük binary)
