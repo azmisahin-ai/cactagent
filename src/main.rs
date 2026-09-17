@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Search the web for the latest news about Rust programming language".to_string()
     };
 
-    println!("=== CactAgent v0.5.0 ===");
+    println!("=== CactAgent v0.6.0 ===");
     println!("Gorev: {}\n", user_task);
 
     // Needle modelini yükle

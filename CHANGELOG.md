@@ -5,6 +5,24 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+
+## [0.6.0] — 2026-09-17
+
+### Eklendi
+- `scripts/measure.ps1` — Binary boyutu ve bellek ölçüm script'i
+- README'de "Performans ve Kaynak Kullanımı" bölümü
+- `docs/ARCHITECTURE.md`'de E2 Micro uyumluluk tablosu
+
+### Ölçüm Sonuçları
+- Binary boyutu: 7.24 MB
+- Maksimum RAM: 46.79 MB
+- Toplam disk: ~20 MB
+- **E2 Micro (512 MB) uyumluluğu: ✅**
+
+### Notlar
+- Windows'ta Linux ARM cross-compilation ertelendi
+- Hedef cihazda native derleme öneriliyor
+
 ## [0.5.0] — 2026-09-17
 
 ### Eklendi

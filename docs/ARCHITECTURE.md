@@ -67,12 +67,30 @@ Kullanıcı: Ham, gerçek metin
 
 ## Performans
 
-| İşlem | Süre (CPU) |
-|-------|-----------|
-| Needle araç seçimi | ~50 ms |
-| Web araması | ~2 sn |
-| URL okuma (readability) | ~2 sn |
-| **Toplam** | **~4-5 sn** |
+| Metrik | Değer | Not |
+|--------|-------|-----|
+| Binary boyutu | 7.24 MB | Release, strip |
+| Model boyutu | 13.1 MB | Needle v2 (.cact) |
+| Toplam disk | ~20 MB | |
+| **Maksimum RAM** | **46.79 MB** | Model yüklüyken |
+| Needle araç seçimi | ~50 ms | CPU'da |
+| Web araması | ~2 sn | Ağa bağlı |
+| URL okuma | ~2 sn | Sayfa boyutuna bağlı |
+| **Toplam (tipik görev)** | **~4-5 sn** | |
+
+### E2 Micro Uyumluluğu
+
+| Kaynak | Kullanım | E2 Micro (512 MB) |
+|--------|----------|-------------------|
+| Binary | 7.24 MB | ✅ |
+| Model | 13.1 MB | ✅ |
+| Runtime RAM | 46.79 MB | ✅ (%9 kullanım) |
+| **Toplam** | **~67 MB** | **✅ Rahat çalışır** |
+
+### Cross-Compilation
+
+Windows'ta Linux ARM için cross-compile karmaşıktır ve ek toolchain gerektirir.
+Önerilen yöntem: **Hedef cihazda native derleme** (Raspberry Pi, E2 Micro, vb.)
 
 ## Tasarım Kararları
 

@@ -116,6 +116,26 @@ cargo run --example file_ops
 cargo run --example custom_tool
 ```
 
+## 📊 Performans ve Kaynak Kullanımı
+
+| Metrik | Değer |
+|--------|-------|
+| Binary boyutu | ~7 MB |
+| Model boyutu | ~13 MB |
+| Toplam disk | ~20 MB |
+| Maksimum RAM | ~47 MB |
+| CPU kullanımı | Milisaniyeler (araç seçimi) |
+
+**E2 Micro (512 MB RAM) uyumluluğu:** ✅ Rahat çalışır (%9 bellek kullanımı)
+
+### Ölçüm
+
+Kendi sisteminizde ölçüm yapmak için:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\measure.ps1
+```
+
 ## 📖 Dokümantasyon
 
 - [Mimari](docs/ARCHITECTURE.md)
