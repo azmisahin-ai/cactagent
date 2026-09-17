@@ -12,6 +12,7 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
         .connect_timeout(std::time::Duration::from_secs(15))
         .build()?;
 
+    // RETRY MEKANIZMASI: 3 kez dene, her denemede 2 saniye bekle
     let mut last_error: Option<Box<dyn std::error::Error>> = None;
     let mut body = String::new();
 
@@ -36,10 +37,12 @@ pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
         }
     }
 
+    // Tüm denemeler başarısız olduysa hata döndür
     if let Some(e) = last_error {
         return Err(e);
     }
 
+    // HTML'i ayrıştır
     let document = Html::parse_document(&body);
 
     let result_selector = Selector::parse(".result").unwrap();
@@ -107,8 +110,15 @@ mod tests {
 
     #[test]
     fn test_clean_ddg_url() {
-        let raw = "//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.rust-lang.org%2F&rut=...";
+        let raw = "//duckduckgo.com/l/?uddg=https%3A%2F%2Fblog.rust-lang.org%2F&rut=abc";
         let cleaned = clean_ddg_url(raw);
         assert_eq!(cleaned, "https://blog.rust-lang.org/");
+    }
+
+    #[test]
+    fn test_clean_ddg_url_no_uddg() {
+        let raw = "https://example.com/";
+        let cleaned = clean_ddg_url(raw);
+        assert_eq!(cleaned, "https://example.com/");
     }
 }

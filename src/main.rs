@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             match reader::read_url(&url) {
                 Ok(content) => {
-                    println!("\n=== SAYFA ICERIGI ===\n");
+                    println!("=== SAYFA ICERIGI ===\n");
                     println!("{}", content);
                 }
                 Err(e) => eprintln!("Okuma hatasi: {}", e),

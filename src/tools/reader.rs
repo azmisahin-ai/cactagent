@@ -37,23 +37,14 @@ pub fn read_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(truncated)
 }
 
-// readability crate'ini dogru API ile cagirir
 fn readability_extract(html: &str, url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    // URL'yi parse et
     let parsed_url: url::Url = url.parse()?;
-
-    // HTML'i mutable cursor'a sar
     let mut cursor = Cursor::new(html.as_bytes());
-
-    // extract fonksiyonu &mut reader ve &Url ister
     let article = readability::extractor::extract(&mut cursor, &parsed_url)?;
-
-    // article.content HTML olarak gelir, metne cevir
     let doc = Html::parse_fragment(&article.content);
     Ok(doc.root_element().text().collect::<Vec<_>>().join(" "))
 }
 
-// Fallback: yogunluk bazli cikarim
 fn extract_with_density(body: &str) -> Result<String, Box<dyn std::error::Error>> {
     let document = Html::parse_document(body);
     let remove_selector =
@@ -120,8 +111,6 @@ fn clean_text(text: &str) -> String {
     let mut cleaned = text.split_whitespace().collect::<Vec<_>>().join(" ");
 
     // Breadcrumb ve navigasyon kalıplarını temizle
-    // "X » Y » Z" formatındaki breadcrumb'ları kaldır
-    // YENİ (pos değişkenini kaldır)
     if cleaned.contains("» ") {
         if let Some(last_arrow) = cleaned.rfind("» ") {
             cleaned = cleaned[last_arrow + 3..].to_string();
