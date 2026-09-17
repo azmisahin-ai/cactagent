@@ -1,5 +1,5 @@
 use cactagent::engine::needle;
-use cactagent::tools::{reader, search, TOOLS_JSON};
+use cactagent::tools::{file_ops, reader, search, TOOLS_JSON};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CLI argümanlarını al
@@ -29,56 +29,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[Dusunce] {}", think);
     }
 
-    // Tool call'u ayrıştır
-    let search_query = if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
-        if let Some(call) = tool_calls.first() {
-            let name = call["name"].as_str().unwrap_or("");
-            if name == "web_search" {
-                call["arguments"]["query"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string()
-            } else {
-                user_task.clone()
-            }
-        } else {
-            user_task.clone()
-        }
-    } else {
-        user_task.clone()
-    };
-
-    // ADIM 2: Web araması
-    println!("\n=== ADIM 2: WEB ARAMASI ===");
-    println!("Sorgu: {}\n", search_query);
-
-    let search_results = match search::web_search(&search_query) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("Arama hatasi: {}", e);
+    // Tool call'ları ayrıştır ve her birini çalıştır
+    if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
+        if tool_calls.is_empty() {
+            println!("Model bos tool call dondurdu.");
             return Ok(());
         }
-    };
 
-    println!("{}", search_results);
+        for call in tool_calls {
+            let name = call["name"].as_str().unwrap_or("bilinmeyen");
+            let args = &call["arguments"];
 
-    // ADIM 3: İlk URL'yi çıkar
-    let first_url = extract_first_url(&search_results);
+            println!("\n=== ARAC: {} ===", name);
+            println!("Argumanlar: {}\n", args);
 
-    match first_url {
-        Some(url) => {
-            println!("=== ADIM 3: URL OKUNUYOR ===");
-            println!("URL: {}\n", url);
-
-            match reader::read_url(&url) {
-                Ok(content) => {
-                    println!("=== SAYFA ICERIGI ===\n");
-                    println!("{}", content);
+            match name {
+                "web_search" => {
+                    if let Some(query) = args["query"].as_str() {
+                        println!("[DEBUG] Web aramasi yapiliyor: {}", query);
+                        match search::web_search(query) {
+                            Ok(r) => {
+                                println!("\n=== ARAMA SONUCLARI ===");
+                                println!("{}", r);
+                            }
+                            Err(e) => eprintln!("Arama hatasi: {}", e),
+                        }
+                    } else {
+                        eprintln!("Hata: 'query' parametresi eksik.");
+                    }
                 }
-                Err(e) => eprintln!("Okuma hatasi: {}", e),
+                "read_url" => {
+                    if let Some(url) = args["url"].as_str() {
+                        println!("[DEBUG] URL okunuyor: {}", url);
+                        match reader::read_url(url) {
+                            Ok(content) => {
+                                println!("\n=== SAYFA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Okuma hatasi: {}", e),
+                        }
+                    } else {
+                        eprintln!("Hata: 'url' parametresi eksik.");
+                    }
+                }
+                "read_file" => {
+                    if let Some(path) = args["path"].as_str() {
+                        println!("[DEBUG] Dosya okunuyor: {}", path);
+                        match file_ops::read_file(path) {
+                            Ok(content) => {
+                                println!("\n=== DOSYA ICERIGI ===");
+                                println!("{}", content);
+                            }
+                            Err(e) => eprintln!("Dosya okuma hatasi: {}", e),
+                        }
+                    } else {
+                        eprintln!("Hata: 'path' parametresi eksik.");
+                    }
+                }
+                "write_file" => {
+                    if let (Some(path), Some(content)) =
+                        (args["path"].as_str(), args["content"].as_str())
+                    {
+                        println!("[DEBUG] Dosya yaziliyor: {}", path);
+                        match file_ops::write_file(path, content) {
+                            Ok(msg) => println!("{}", msg),
+                            Err(e) => eprintln!("Dosya yazma hatasi: {}", e),
+                        }
+                    } else {
+                        eprintln!("Hata: 'path' ve 'content' parametreleri gerekli.");
+                    }
+                }
+                "list_dir" => {
+                    let path = args["path"].as_str().unwrap_or(".");
+                    println!("[DEBUG] Dizin listeleniyor: {}", path);
+                    match file_ops::list_dir(path) {
+                        Ok(listing) => {
+                            println!("\n=== DIZIN ICERIGI ===");
+                            println!("{}", listing);
+                        }
+                        Err(e) => eprintln!("Dizin listeleme hatasi: {}", e),
+                    }
+                }
+                _ => {
+                    eprintln!("Bilinmeyen arac: {}", name);
+                }
             }
         }
-        None => eprintln!("Arama sonuclarindan URL cikarilamadi."),
+    } else {
+        println!("Model bir tool call uretmedi.");
+        println!("Nihai cikti: {}", result.text);
     }
 
     println!("\n=== ISLEM TAMAMLANDI ===");
@@ -86,7 +125,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn extract_first_url(search_results: &str) -> Option<String> {
+/// Arama sonuçlarından ilk HTTP URL'sini çıkarır.
+/// Test amaçlı public bırakıldı.
+#[allow(dead_code)]
+pub fn extract_first_url(search_results: &str) -> Option<String> {
     for line in search_results.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("URL: ") {
