@@ -1,9 +1,11 @@
+use crate::i18n::Language;
 use scraper::{Html, Selector};
 
-pub fn web_search(query: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn web_search(query: &str, lang: Language) -> Result<String, Box<dyn std::error::Error>> {
     let url = format!(
-        "https://html.duckduckgo.com/html/?q={}",
-        urlencoding::encode(query)
+        "https://html.duckduckgo.com/html/?q={}&kl={}",
+        urlencoding::encode(query),
+        lang.ddg_region()
     );
 
     let client = reqwest::blocking::Client::builder()

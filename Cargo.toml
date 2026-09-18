@@ -1,6 +1,6 @@
 [package]
 name = "cactagent"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 authors = ["Azmi Şahin <azmisahin@outlook.com>"]
 description = "A fully local AI agent contained in a single binary."

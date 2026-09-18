@@ -1,9 +1,13 @@
 use cactagent::engine::needle;
+use cactagent::i18n::{self, Language};
 use cactagent::tools::sandbox;
 use cactagent::tools::{audit, file_ops, ratelimit, reader, search, TOOLS_JSON};
 
 fn print_help() {
-    println!("CactAgent v{} - Tamamen yerel AI ajani", env!("CARGO_PKG_VERSION"));
+    println!(
+        "CactAgent v{} - Tamamen yerel AI ajani",
+        env!("CARGO_PKG_VERSION")
+    );
     println!();
     println!("KULLANIM:");
     println!("    cactagent [OPTIONS] \"<gorev>\"");
@@ -12,10 +16,11 @@ fn print_help() {
     println!("    --help              Bu yardim mesajini goster");
     println!("    --version           Surum bilgisini goster");
     println!("    --auto-approve      Dosya yazma onayini atla (script/CI icin)");
+    println!("    --lang <kod>        Dil secimi (tr, en, de, fr)");
     println!();
     println!("ORNEKLER:");
     println!("    cactagent \"Rust haberlerini arastir\"");
-    println!("    cactagent \"Write 'Merhaba' to notes.txt\"");
+    println!("    cactagent --lang en \"Search Rust news\"");
     println!("    cactagent --auto-approve \"Write 'test' to test.txt\"");
     println!();
     println!("ARACLAR:");
@@ -25,11 +30,18 @@ fn print_help() {
     println!("    write_file   - Sandbox icindeki dosyaya yaz");
     println!("    list_dir     - Sandbox icindeki dizini listele");
     println!();
+    println!("DESTEKLENEN DILLER:");
+    println!("    tr  - Turkce");
+    println!("    en  - Ingilizce (varsayilan)");
+    println!("    de  - Almanca");
+    println!("    fr  - Fransizca");
+    println!();
     println!("GUVENLIK:");
     println!("    - Tum dosya islemleri ./workspace/ icinde sinirli");
     println!("    - Path traversal ve absolute path reddedilir");
     println!("    - write_file varsayilan olarak onay ister");
     println!("    - Maksimum dosya boyutu: 1 MB");
+    println!("    - Rate limiting: araclar dakikada sinirli");
 }
 
 fn print_version() {
@@ -57,9 +69,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[!] Otomatik onay modu aktif.\n");
     }
 
+    // --lang flag'ini kontrol et
+    let mut forced_lang: Option<Language> = None;
+    for (i, arg) in args.iter().enumerate() {
+        if arg == "--lang" && i + 1 < args.len() {
+            forced_lang = Language::from_code(&args[i + 1]);
+            if forced_lang.is_none() {
+                eprintln!(
+                    "[!] Bilinmeyen dil: {}. Varsayilan (en) kullanilacak.",
+                    args[i + 1]
+                );
+            }
+        }
+    }
+
     let filtered_args: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with("--"))
+        .filter(|a| {
+            ![
+                "tr", "en", "de", "fr", "turkish", "english", "german", "french",
+            ]
+            .contains(&a.to_lowercase().as_str())
+        })
         .cloned()
         .collect();
 
@@ -69,12 +101,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Search the web for the latest news about Rust programming language".to_string()
     };
 
-    println!("=== CactAgent v{} ===", env!("CARGO_PKG_VERSION"));
-    println!("Gorev: {}\n", user_task);
+    // Dil algıla
+    let lang = forced_lang.unwrap_or_else(|| i18n::detect_language(&user_task));
 
+    println!("=== CactAgent v{} ===", env!("CARGO_PKG_VERSION"));
+    println!("Gorev: {}", user_task);
+    println!("Dil: {} ({})\n", lang.code(), lang.ddg_region());
+
+    // Needle modelini yükle
     let needle_path = needle::ensure_model();
     let needle_engine = needle::load(&needle_path);
 
+    // ADIM 1: Araç seçimi
     println!("=== ADIM 1: ARAC SECIMI ===");
     let result = needle_engine.run(&user_task, TOOLS_JSON);
 
@@ -102,14 +140,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Rate limit kontrolü
             let limit = ratelimit::limit_for_tool(name);
             if let Err(wait_secs) = ratelimit::check_rate_limit(name, limit) {
-                eprintln!(
-                    "[RATE LIMIT] '{}' araci cok sik cagrildi. {} saniye bekleyin.",
-                    name, wait_secs
-                );
+                let msg = i18n::error_message(lang, "rate_limit");
+                eprintln!("[RATE LIMIT] {} ({} sn)", msg, wait_secs);
                 audit::log_tool_call(
                     name,
                     &args.to_string(),
-                    &format!("RATE LIMIT: {} saniye", wait_secs),
+                    &format!("RATE LIMIT: {} sn", wait_secs),
                 );
                 continue;
             }
@@ -117,13 +153,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let tool_result: Result<String, String> = match name {
                 "web_search" => {
                     if let Some(query) = args["query"].as_str() {
-                        match search::web_search(query) {
+                        match search::web_search(query, lang) {
                             Ok(r) => {
                                 println!("=== ARAMA SONUCLARI ===");
                                 println!("{}", r);
                                 Ok(format!("{} sonuc", r.lines().count()))
                             }
-                            Err(e) => Err(format!("Arama hatasi: {}", e)),
+                            Err(e) => Err(format!(
+                                "{}: {}",
+                                i18n::error_message(lang, "search_failed"),
+                                e
+                            )),
                         }
                     } else {
                         Err("'query' parametresi eksik".to_string())
@@ -183,7 +223,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(e) => Err(format!("Dizin listeleme hatasi: {}", e)),
                     }
                 }
-                _ => Err(format!("Bilinmeyen arac: {}", name)),
+                _ => Err(format!(
+                    "{}: {}",
+                    i18n::error_message(lang, "unknown_tool"),
+                    name
+                )),
             };
 
             // Audit log

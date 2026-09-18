@@ -5,6 +5,33 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+
+
+**CHANGELOG.md**'ye v0.9.0 notu ekle:
+
+## [0.9.0] — 2026-09-18
+
+### Eklendi
+- Çoklu dil desteği (`src/i18n.rs`)
+- Otomatik dil algılama (karakter + kelime analizi)
+- `--lang` flag'i (`tr`, `en`, `de`, `fr`)
+- DuckDuckGo bölge parametresi (`kl`)
+- Hata mesajları seçilen dile göre
+- 9 yeni test (toplam 55 test)
+
+### Diller
+- Türkçe (`tr`)
+- İngilizce (`en`) — varsayılan
+- Almanca (`de`)
+- Fransızca (`fr`)
+
+### Neden?
+- Türkçe kullanıcılar için daha iyi arama sonuçları
+- DuckDuckGo bölge parametresi ile daha alakalı sonuçlar
+- Tamamen içsel, dış bağımlılık yok
+
+## [0.8.0] — 2026-09-18
+
 ### Rate Limiting
 
 Her araç, dakikada maksimum çağrı sayısı ile sınırlıdır:

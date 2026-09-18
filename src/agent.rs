@@ -144,10 +144,13 @@ pub fn build_input(task: &str, context: &[String]) -> String {
 
 /// Bir araç çağrısını çalıştırır
 pub fn execute_tool(name: &str, args: &Value) -> Result<String, Box<dyn std::error::Error>> {
+    use crate::i18n::Language;
+
     match name {
         "web_search" => {
             let query = args["query"].as_str().ok_or("'query' parametresi eksik")?;
-            search::web_search(query)
+            // Agent varsayılan olarak İngilizce kullanır (ileride dil parametresi eklenebilir)
+            search::web_search(query, Language::English)
         }
         "read_url" => {
             let url = args["url"].as_str().ok_or("'url' parametresi eksik")?;
