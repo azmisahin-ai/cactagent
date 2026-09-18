@@ -5,6 +5,35 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [1.0.0] — 2026-09-18
+
+### İlk Kararlı Sürüm
+
+CactAgent, tamamen yerel, tek binary'lik bir AI ajanıdır.
+
+### Özellikler
+- 5 araç: web_search, read_url, read_file, write_file, list_dir
+- Hibrit niyet algılama (keyword + Needle modeli)
+- 4 dil: Türkçe, İngilizce, Almanca, Fransızca
+- Sandbox'lı dosya işlemleri (path traversal koruması)
+- Kullanıcı onayı (write_file için)
+- Audit log (tüm araç çağrıları)
+- Rate limiting (dakikada maksimum çağrı)
+- Otomatik model indirme
+
+### Performans
+- Binary: ~7 MB
+- RAM: ~47 MB
+- E2 Micro (512 MB) uyumlu
+
+### Test
+- 70 test, hepsi geçiyor
+- CI/CD (GitHub Actions)
+
+### Bilinen Sorunlar
+- DuckDuckGo rate limit (HTTP 202) — geçici, kodda retry var
+- Needle v2 sınırı: belirsiz ifadelerde uydurma yapabilir (hibrit intent ile çözüldü)
+
 ## [0.9.1] — 2026-09-18
 
 ### Eklendi
