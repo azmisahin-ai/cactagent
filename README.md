@@ -3,7 +3,7 @@
 [![CI](https://github.com/azmisahin-ai/cactagent/actions/workflows/ci.yml/badge.svg)](https://github.com/azmisahin-ai/cactagent/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](https://github.com/azmisahin-ai/cactagent/releases)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](https://github.com/azmisahin-ai/cactagent/releases)
 
 **Tamamen yerel, tek binary'lik AI ajanı.** Sunucu yok, API anahtarı yok, bulut yok. Sadece Rust.
 
@@ -159,6 +159,20 @@ Log dosyasını görmek için:
 ```bash
 type workspace\logs\audit.log
 ```
+
+### Rate Limiting
+
+Her araç, dakikada maksimum çağrı sayısı ile sınırlıdır:
+
+| Araç | Limit |
+|------|-------|
+| `web_search` | Dakikada 10 |
+| `read_url` | Dakikada 20 |
+| `write_file` | Dakikada 5 |
+| `read_file` | Dakikada 60 |
+| `list_dir` | Dakikada 60 |
+
+Bu, DuckDuckGo gibi servislerin bizi engellemesini önler ve ajanın kontrolsüz döngüye girmesini engeller.
 
 ## 🗺️ Yol Haritası
 

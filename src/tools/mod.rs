@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod file_ops;
+pub mod ratelimit;
 pub mod reader;
 pub mod sandbox;
 pub mod search;

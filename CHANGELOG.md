@@ -5,6 +5,20 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+### Rate Limiting
+
+Her araç, dakikada maksimum çağrı sayısı ile sınırlıdır:
+
+| Araç | Limit |
+|------|-------|
+| `web_search` | Dakikada 10 |
+| `read_url` | Dakikada 20 |
+| `write_file` | Dakikada 5 |
+| `read_file` | Dakikada 60 |
+| `list_dir` | Dakikada 60 |
+
+Bu, DuckDuckGo gibi servislerin bizi engellemesini önler ve ajanın kontrolsüz döngüye girmesini engeller.
+
 ## [0.7.0] — 2026-09-17
 
 ### Eklendi

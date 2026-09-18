@@ -1,9 +1,9 @@
 use cactagent::engine::needle;
 use cactagent::tools::sandbox;
-use cactagent::tools::{audit, file_ops, reader, search, TOOLS_JSON};
+use cactagent::tools::{audit, file_ops, ratelimit, reader, search, TOOLS_JSON};
 
 fn print_help() {
-    println!("CactAgent v0.7.0 - Tamamen yerel AI ajani");
+    println!("CactAgent v0.8.0 - Tamamen yerel AI ajani");
     println!();
     println!("KULLANIM:");
     println!("    cactagent [OPTIONS] \"<gorev>\"");
@@ -98,6 +98,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("\n=== ARAC: {} ===", name);
             println!("Argumanlar: {}\n", args);
+
+            // Rate limit kontrolü
+            let limit = ratelimit::limit_for_tool(name);
+            if let Err(wait_secs) = ratelimit::check_rate_limit(name, limit) {
+                eprintln!(
+                    "[RATE LIMIT] '{}' araci cok sik cagrildi. {} saniye bekleyin.",
+                    name, wait_secs
+                );
+                audit::log_tool_call(
+                    name,
+                    &args.to_string(),
+                    &format!("RATE LIMIT: {} saniye", wait_secs),
+                );
+                continue;
+            }
 
             let tool_result: Result<String, String> = match name {
                 "web_search" => {
