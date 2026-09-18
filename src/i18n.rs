@@ -66,19 +66,35 @@ pub fn detect_language(text: &str) -> Language {
     let french_chars = ['é', 'è', 'ê', 'à', 'ç', 'ô', 'û'];
     let french_words = ["et", "le", "la", "les", "est", "pour", "avec"];
 
-    let lower = text.to_lowercase();
+    // Kelimeleri ayır (tam kelime eşleştirmesi için)
+    let words: Vec<&str> = text
+        .split_whitespace()
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+        .filter(|w| !w.is_empty())
+        .collect();
+
+    let lower_words: Vec<String> = words.iter().map(|w| w.to_lowercase()).collect();
 
     // Türkçe kontrolü
     let tr_char_count = text.chars().filter(|c| turkish_chars.contains(c)).count();
-    let tr_word_count = turkish_words.iter().filter(|w| lower.contains(*w)).count();
+    let tr_word_count = turkish_words
+        .iter()
+        .filter(|w| lower_words.iter().any(|lw| lw == *w))
+        .count();
 
     // Almanca kontrolü
     let de_char_count = text.chars().filter(|c| german_chars.contains(c)).count();
-    let de_word_count = german_words.iter().filter(|w| lower.contains(*w)).count();
+    let de_word_count = german_words
+        .iter()
+        .filter(|w| lower_words.iter().any(|lw| lw == *w))
+        .count();
 
     // Fransızca kontrolü
     let fr_char_count = text.chars().filter(|c| french_chars.contains(c)).count();
-    let fr_word_count = french_words.iter().filter(|w| lower.contains(*w)).count();
+    let fr_word_count = french_words
+        .iter()
+        .filter(|w| lower_words.iter().any(|lw| lw == *w))
+        .count();
 
     let tr_score = tr_char_count * 3 + tr_word_count * 2;
     let de_score = de_char_count * 3 + de_word_count * 2;
@@ -199,5 +215,28 @@ mod tests {
     fn test_error_message_english_fallback() {
         let msg = error_message(Language::German, "search_failed");
         assert_eq!(msg, "Search failed."); // İngilizce'ye düşer
+    }
+
+    #[test]
+    fn test_detect_english_not_french() {
+        // "la" kelimesi "lang" içinde geçiyor ama tam kelime değil
+        assert_eq!(
+            detect_language("Read https://blog.rust-lang.org/"),
+            Language::English
+        );
+    }
+
+    #[test]
+    fn test_detect_english_not_german() {
+        // "die" kelimesi "directory" içinde geçiyor ama tam kelime değil
+        assert_eq!(detect_language("List the directory"), Language::English);
+    }
+
+    #[test]
+    fn test_detect_turkish_still_works() {
+        assert_eq!(
+            detect_language("Rust haberlerini araştır"),
+            Language::Turkish
+        );
     }
 }
