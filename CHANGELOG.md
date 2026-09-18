@@ -5,9 +5,22 @@ Tüm önemli değişiklikler bu dosyada belgelenir.
 Format: [Keep a Changelog](https://keepachangelog.com/)
 Sürümleme: [Semantic Versioning](https://semver.org/)
 
+## [0.9.1] — 2026-09-18
 
+### Eklendi
+- Hibrit niyet algılama (`src/intent.rs`)
+- Keyword matching ile basit görevler anında çözülür
+- 11 yeni test (toplam 66 test)
 
-**CHANGELOG.md**'ye v0.9.0 notu ekle:
+### Neden?
+Needle v2 (26M), Türkçe ve belirsiz ifadelerde başarısız oluyordu:
+- "Rust haberlerini araştır" → `get_streak_info` uydurdu
+- "Search Rust news" → `search_news` uydurdu
+
+Hibrit yaklaşım, basit görevleri **model çalıştırmadan** çözer:
+- Daha hızlı (model yükleme yok)
+- Daha güvenilir (uydurma yok)
+- Çok dilli (Türkçe dahil)
 
 ## [0.9.0] — 2026-09-18
 

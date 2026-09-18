@@ -1,54 +1,8 @@
 use cactagent::engine::needle;
 use cactagent::i18n::{self, Language};
+use cactagent::intent;
 use cactagent::tools::sandbox;
 use cactagent::tools::{audit, file_ops, ratelimit, reader, search, TOOLS_JSON};
-
-fn print_help() {
-    println!(
-        "CactAgent v{} - Tamamen yerel AI ajani",
-        env!("CARGO_PKG_VERSION")
-    );
-    println!();
-    println!("KULLANIM:");
-    println!("    cactagent [OPTIONS] \"<gorev>\"");
-    println!();
-    println!("OPSIYONLAR:");
-    println!("    --help              Bu yardim mesajini goster");
-    println!("    --version           Surum bilgisini goster");
-    println!("    --auto-approve      Dosya yazma onayini atla (script/CI icin)");
-    println!("    --lang <kod>        Dil secimi (tr, en, de, fr)");
-    println!();
-    println!("ORNEKLER:");
-    println!("    cactagent \"Rust haberlerini arastir\"");
-    println!("    cactagent --lang en \"Search Rust news\"");
-    println!("    cactagent --auto-approve \"Write 'test' to test.txt\"");
-    println!();
-    println!("ARACLAR:");
-    println!("    web_search   - DuckDuckGo uzerinden arama");
-    println!("    read_url     - Sayfa icerigini oku ve temizle");
-    println!("    read_file    - Sandbox icindeki dosyayi oku");
-    println!("    write_file   - Sandbox icindeki dosyaya yaz");
-    println!("    list_dir     - Sandbox icindeki dizini listele");
-    println!();
-    println!("DESTEKLENEN DILLER:");
-    println!("    tr  - Turkce");
-    println!("    en  - Ingilizce (varsayilan)");
-    println!("    de  - Almanca");
-    println!("    fr  - Fransizca");
-    println!();
-    println!("GUVENLIK:");
-    println!("    - Tum dosya islemleri ./workspace/ icinde sinirli");
-    println!("    - Path traversal ve absolute path reddedilir");
-    println!("    - write_file varsayilan olarak onay ister");
-    println!("    - Maksimum dosya boyutu: 1 MB");
-    println!("    - Rate limiting: araclar dakikada sinirli");
-}
-
-fn print_version() {
-    println!("CactAgent v{}", env!("CARGO_PKG_VERSION"));
-    println!("Lisans: {}", env!("CARGO_PKG_LICENSE"));
-    println!("Repo: {}", env!("CARGO_PKG_REPOSITORY"));
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -69,20 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("[!] Otomatik onay modu aktif.\n");
     }
 
-    // --lang flag'ini kontrol et
+    // --lang flag
     let mut forced_lang: Option<Language> = None;
     for (i, arg) in args.iter().enumerate() {
         if arg == "--lang" && i + 1 < args.len() {
             forced_lang = Language::from_code(&args[i + 1]);
             if forced_lang.is_none() {
-                eprintln!(
-                    "[!] Bilinmeyen dil: {}. Varsayilan (en) kullanilacak.",
-                    args[i + 1]
-                );
+                eprintln!("[!] Bilinmeyen dil: {}. Varsayilan (en).", args[i + 1]);
             }
         }
     }
 
+    // Flag'leri ve dil kodlarını temizle
     let filtered_args: Vec<String> = args
         .iter()
         .filter(|a| !a.starts_with("--"))
@@ -108,140 +60,214 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Gorev: {}", user_task);
     println!("Dil: {} ({})\n", lang.code(), lang.ddg_region());
 
-    // Needle modelini yükle
-    let needle_path = needle::ensure_model();
-    let needle_engine = needle::load(&needle_path);
-
-    // ADIM 1: Araç seçimi
+    // ADIM 1: Araç seçimi (hibrit: önce keyword, sonra model)
     println!("=== ADIM 1: ARAC SECIMI ===");
-    let result = needle_engine.run(&user_task, TOOLS_JSON);
 
-    println!("Ham cikti:");
-    println!("{}", result.text);
-    println!("---");
+    let tool_calls: Vec<serde_json::Value> =
+        if let Some(intent_calls) = intent::detect_intent(&user_task) {
+            println!("[Intent] Keyword matching ile arac secildi.");
+            println!("[Intent] {}", intent_calls);
 
-    if let Some(think) = needle::extract_think(&result.text) {
-        println!("[Dusunce] {}", think);
-    }
+            // intent_calls bir JSON dizisi → Vec<Value>'ye çevir
+            if let Some(arr) = intent_calls.as_array() {
+                arr.clone()
+            } else {
+                vec![intent_calls]
+            }
+        } else {
+            println!("[Intent] Keyword eslesmedi, Needle modeli cagriliyor...\n");
 
-    if let Some(tool_calls) = needle::parse_tool_call(&result.text) {
-        if tool_calls.is_empty() {
-            println!("Model bos tool call dondurdu.");
-            return Ok(());
-        }
+            let needle_path = needle::ensure_model();
+            let needle_engine = needle::load(&needle_path);
 
-        for call in tool_calls {
-            let name = call["name"].as_str().unwrap_or("bilinmeyen");
-            let args = &call["arguments"];
+            let result = needle_engine.run(&user_task, TOOLS_JSON);
 
-            println!("\n=== ARAC: {} ===", name);
-            println!("Argumanlar: {}\n", args);
+            println!("Ham cikti:");
+            println!("{}", result.text);
+            println!("---");
 
-            // Rate limit kontrolü
-            let limit = ratelimit::limit_for_tool(name);
-            if let Err(wait_secs) = ratelimit::check_rate_limit(name, limit) {
-                let msg = i18n::error_message(lang, "rate_limit");
-                eprintln!("[RATE LIMIT] {} ({} sn)", msg, wait_secs);
-                audit::log_tool_call(
-                    name,
-                    &args.to_string(),
-                    &format!("RATE LIMIT: {} sn", wait_secs),
-                );
-                continue;
+            if let Some(think) = needle::extract_think(&result.text) {
+                println!("[Dusunce] {}", think);
             }
 
-            let tool_result: Result<String, String> = match name {
-                "web_search" => {
-                    if let Some(query) = args["query"].as_str() {
-                        match search::web_search(query, lang) {
-                            Ok(r) => {
-                                println!("=== ARAMA SONUCLARI ===");
-                                println!("{}", r);
-                                Ok(format!("{} sonuc", r.lines().count()))
-                            }
-                            Err(e) => Err(format!(
-                                "{}: {}",
-                                i18n::error_message(lang, "search_failed"),
-                                e
-                            )),
-                        }
-                    } else {
-                        Err("'query' parametresi eksik".to_string())
-                    }
-                }
-                "read_url" => {
-                    if let Some(url) = args["url"].as_str() {
-                        match reader::read_url(url) {
-                            Ok(content) => {
-                                println!("=== SAYFA ICERIGI ===");
-                                println!("{}", content);
-                                Ok(format!("{} karakter", content.len()))
-                            }
-                            Err(e) => Err(format!("Okuma hatasi: {}", e)),
-                        }
-                    } else {
-                        Err("'url' parametresi eksik".to_string())
-                    }
-                }
-                "read_file" => {
-                    if let Some(path) = args["path"].as_str() {
-                        match file_ops::read_file(path) {
-                            Ok(content) => {
-                                println!("=== DOSYA ICERIGI ===");
-                                println!("{}", content);
-                                Ok(format!("{} karakter", content.len()))
-                            }
-                            Err(e) => Err(format!("Dosya okuma hatasi: {}", e)),
-                        }
-                    } else {
-                        Err("'path' parametresi eksik".to_string())
-                    }
-                }
-                "write_file" => {
-                    if let (Some(path), Some(content)) =
-                        (args["path"].as_str(), args["content"].as_str())
-                    {
-                        match file_ops::write_file(path, content) {
-                            Ok(msg) => {
-                                println!("{}", msg);
-                                Ok(format!("{} byte yazildi", content.len()))
-                            }
-                            Err(e) => Err(format!("Dosya yazma hatasi: {}", e)),
-                        }
-                    } else {
-                        Err("'path' ve 'content' parametreleri gerekli".to_string())
-                    }
-                }
-                "list_dir" => {
-                    let path = args["path"].as_str().unwrap_or(".");
-                    match file_ops::list_dir(path) {
-                        Ok(listing) => {
-                            println!("=== DIZIN ICERIGI ===");
-                            println!("{}", listing);
-                            Ok(format!("{} girdi", listing.lines().count()))
-                        }
-                        Err(e) => Err(format!("Dizin listeleme hatasi: {}", e)),
-                    }
-                }
-                _ => Err(format!(
-                    "{}: {}",
-                    i18n::error_message(lang, "unknown_tool"),
-                    name
-                )),
-            };
+            needle::parse_tool_call(&result.text).unwrap_or_default()
+        };
 
-            // Audit log
-            let log_result = match &tool_result {
-                Ok(r) => r.clone(),
-                Err(e) => format!("HATA: {}", e),
-            };
-            audit::log_tool_call(name, &args.to_string(), &log_result);
+    // ADIM 2: Araçları çalıştır
+    if tool_calls.is_empty() {
+        println!("Model bos tool call dondurdu.");
+        return Ok(());
+    }
+
+    for call in &tool_calls {
+        let name = call["name"].as_str().unwrap_or("bilinmeyen");
+        let args = &call["arguments"];
+
+        println!("\n=== ARAC: {} ===", name);
+        println!("Argumanlar: {}\n", args);
+
+        // Rate limit kontrolü
+        let limit = ratelimit::limit_for_tool(name);
+        if let Err(wait_secs) = ratelimit::check_rate_limit(name, limit) {
+            let msg = i18n::error_message(lang, "rate_limit");
+            eprintln!("[RATE LIMIT] {} ({} sn)", msg, wait_secs);
+            audit::log_tool_call(
+                name,
+                &args.to_string(),
+                &format!("RATE LIMIT: {} sn", wait_secs),
+            );
+            continue;
         }
-    } else {
-        println!("Model bir tool call uretmedi.");
+
+        let tool_result: Result<String, String> = match name {
+            "web_search" => {
+                if let Some(query) = args["query"].as_str() {
+                    match search::web_search(query, lang) {
+                        Ok(r) => {
+                            println!("=== ARAMA SONUCLARI ===");
+                            println!("{}", r);
+                            Ok(format!("{} sonuc", r.lines().count()))
+                        }
+                        Err(e) => Err(format!(
+                            "{}: {}",
+                            i18n::error_message(lang, "search_failed"),
+                            e
+                        )),
+                    }
+                } else {
+                    Err("'query' parametresi eksik".to_string())
+                }
+            }
+            "read_url" => {
+                if let Some(url) = args["url"].as_str() {
+                    match reader::read_url(url) {
+                        Ok(content) => {
+                            println!("=== SAYFA ICERIGI ===");
+                            println!("{}", content);
+                            Ok(format!("{} karakter", content.len()))
+                        }
+                        Err(e) => Err(format!(
+                            "{}: {}",
+                            i18n::error_message(lang, "read_failed"),
+                            e
+                        )),
+                    }
+                } else {
+                    Err("'url' parametresi eksik".to_string())
+                }
+            }
+            "read_file" => {
+                if let Some(path) = args["path"].as_str() {
+                    match file_ops::read_file(path) {
+                        Ok(content) => {
+                            println!("=== DOSYA ICERIGI ===");
+                            println!("{}", content);
+                            Ok(format!("{} karakter", content.len()))
+                        }
+                        Err(e) => Err(format!(
+                            "{}: {}",
+                            i18n::error_message(lang, "file_not_found"),
+                            e
+                        )),
+                    }
+                } else {
+                    Err("'path' parametresi eksik".to_string())
+                }
+            }
+            "write_file" => {
+                if let (Some(path), Some(content)) =
+                    (args["path"].as_str(), args["content"].as_str())
+                {
+                    match file_ops::write_file(path, content) {
+                        Ok(msg) => {
+                            println!("{}", msg);
+                            Ok(format!("{} byte yazildi", content.len()))
+                        }
+                        Err(e) => Err(format!("Dosya yazma hatasi: {}", e)),
+                    }
+                } else {
+                    Err("'path' ve 'content' parametreleri gerekli".to_string())
+                }
+            }
+            "list_dir" => {
+                let path = args["path"].as_str().unwrap_or(".");
+                match file_ops::list_dir(path) {
+                    Ok(listing) => {
+                        println!("=== DIZIN ICERIGI ===");
+                        println!("{}", listing);
+                        Ok(format!("{} girdi", listing.lines().count()))
+                    }
+                    Err(e) => Err(format!("Dizin listeleme hatasi: {}", e)),
+                }
+            }
+            _ => Err(format!(
+                "{}: {}",
+                i18n::error_message(lang, "unknown_tool"),
+                name
+            )),
+        };
+
+        // Audit log
+        let log_result = match &tool_result {
+            Ok(r) => r.clone(),
+            Err(e) => format!("HATA: {}", e),
+        };
+        audit::log_tool_call(name, &args.to_string(), &log_result);
     }
 
     println!("\n=== ISLEM TAMAMLANDI ===");
 
     Ok(())
+}
+
+fn print_help() {
+    println!(
+        "CactAgent v{} - Tamamen yerel AI ajani",
+        env!("CARGO_PKG_VERSION")
+    );
+    println!();
+    println!("KULLANIM:");
+    println!("    cactagent [OPTIONS] \"<gorev>\"");
+    println!();
+    println!("OPSIYONLAR:");
+    println!("    --help              Bu yardim mesajini goster");
+    println!("    --version           Surum bilgisini goster");
+    println!("    --auto-approve      Dosya yazma onayini atla");
+    println!("    --lang <kod>        Dil secimi (tr, en, de, fr)");
+    println!();
+    println!("ORNEKLER:");
+    println!("    cactagent \"Rust haberlerini arastir\"");
+    println!("    cactagent \"Search the web for Rust news\"");
+    println!("    cactagent \"Read https://blog.rust-lang.org/\"");
+    println!("    cactagent --lang en \"Search Rust news\"");
+    println!();
+    println!("ARACLAR:");
+    println!("    web_search   - DuckDuckGo uzerinden arama");
+    println!("    read_url     - Sayfa icerigini oku ve temizle");
+    println!("    read_file    - Sandbox icindeki dosyayi oku");
+    println!("    write_file   - Sandbox icindeki dosyaya yaz");
+    println!("    list_dir     - Sandbox icindeki dizini listele");
+    println!();
+    println!("DESTEKLENEN DILLER:");
+    println!("    tr  - Turkce");
+    println!("    en  - Ingilizce (varsayilan)");
+    println!("    de  - Almanca");
+    println!("    fr  - Fransizca");
+    println!();
+    println!("NIYET ALGILAMA:");
+    println!("    Basit gorevler keyword matching ile aninda cozulur.");
+    println!("    Karmasik gorevler icin Needle modeli devreye girer.");
+    println!();
+    println!("GUVENLIK:");
+    println!("    - Tum dosya islemleri ./workspace/ icinde sinirli");
+    println!("    - Path traversal ve absolute path reddedilir");
+    println!("    - write_file varsayilan olarak onay ister");
+    println!("    - Maksimum dosya boyutu: 1 MB");
+    println!("    - Rate limiting: araclar dakikada sinirli");
+}
+
+fn print_version() {
+    println!("CactAgent v{}", env!("CARGO_PKG_VERSION"));
+    println!("Lisans: {}", env!("CARGO_PKG_LICENSE"));
+    println!("Repo: {}", env!("CARGO_PKG_REPOSITORY"));
 }

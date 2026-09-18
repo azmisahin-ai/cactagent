@@ -149,7 +149,6 @@ pub fn execute_tool(name: &str, args: &Value) -> Result<String, Box<dyn std::err
     match name {
         "web_search" => {
             let query = args["query"].as_str().ok_or("'query' parametresi eksik")?;
-            // Agent varsayılan olarak İngilizce kullanır (ileride dil parametresi eklenebilir)
             search::web_search(query, Language::English)
         }
         "read_url" => {

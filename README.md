@@ -3,7 +3,7 @@
 [![CI](https://github.com/azmisahin-ai/cactagent/actions/workflows/ci.yml/badge.svg)](https://github.com/azmisahin-ai/cactagent/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](https://github.com/azmisahin-ai/cactagent/releases)
+[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](https://github.com/azmisahin-ai/cactagent/releases)
 
 **Tamamen yerel, tek binary'lik AI ajanı.** Sunucu yok, API anahtarı yok, bulut yok. Sadece Rust.
 
@@ -189,6 +189,28 @@ Manuel dil seçimi:
 ```bash
 cactagent --lang en "Search Rust news"
 cactagent --lang tr "Rust haberlerini araştır"
+```
+
+### Hibrit Niyet Algılama
+
+CactAgent, iki katmanlı bir niyet algılama sistemi kullanır:
+
+1. **Keyword Matching (Hızlı):** Basit görevler ("ara", "oku", "yaz", "listele") anında çözülür. Model çalıştırmaya gerek yok.
+2. **Needle Modeli (Yedek):** Karmaşık görevler için 26M parametreli Needle devreye girer.
+
+Bu sayede:
+- ✅ Basit görevler **her zaman** çalışır (Türkçe dahil)
+- ✅ Karmaşık görevler için hala model var
+- ✅ Model çalışmadığında sistem çökmez
+- ✅ E2 Micro'da daha hızlı (model yükleme yok)
+
+Örnek:
+```bash
+# Keyword matching ile anında çözülür
+cactagent "Rust haberlerini araştır"
+
+# Needle modeli devreye girer
+cactagent "What is the capital of France and why?"
 ```
 
 ## 🗺️ Yol Haritası
