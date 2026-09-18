@@ -3,7 +3,7 @@ use cactagent::tools::sandbox;
 use cactagent::tools::{audit, file_ops, ratelimit, reader, search, TOOLS_JSON};
 
 fn print_help() {
-    println!("CactAgent v0.8.0 - Tamamen yerel AI ajani");
+    println!("CactAgent v{} - Tamamen yerel AI ajani", env!("CARGO_PKG_VERSION"));
     println!();
     println!("KULLANIM:");
     println!("    cactagent [OPTIONS] \"<gorev>\"");
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Search the web for the latest news about Rust programming language".to_string()
     };
 
-    println!("=== CactAgent v0.7.0 ===");
+    println!("=== CactAgent v{} ===", env!("CARGO_PKG_VERSION"));
     println!("Gorev: {}\n", user_task);
 
     let needle_path = needle::ensure_model();
